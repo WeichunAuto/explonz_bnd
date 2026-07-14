@@ -1,0 +1,38 @@
+@baseUrl = http://127.0.0.1:3005/api
+
+
+### Test index route
+GET http://127.0.0.1:3005/
+
+### Test query route
+GET {{baseUrl}}/get_user?name=Bobby
+
+### Test query with pagination
+GET {{baseUrl}}/query_by_keyword?keyword=bobby&page=1&size=3
+
+### Test create user route
+POST {{baseUrl}}/create_user
+Content-Type: application/json
+
+{
+    "fullname": "Genlisdfadfadfasdfasdfadfasdfads",
+    "gender": "Male",
+    "email": "Genli@email",
+    "password_hash": "a12345",
+    "ws_id": 1
+}
+
+### Test create workspace route
+POST {{baseUrl}}/create_workspace
+Content-Type: application/json
+
+{
+  "name": "Weekly Study",
+  "owner_id": 0
+}
+
+### Test update user ws_id by id
+PATCH {{baseUrl}}/update_user_ws_by_id/5/1
+
+### Test delete user by id
+DELETE {{baseUrl}}/delete_user_by_id/4

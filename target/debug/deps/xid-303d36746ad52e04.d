@@ -1,0 +1,11 @@
+/Users/wangweichun/Desktop/Study/Rust/Axum/axum-template/target/debug/deps/xid-303d36746ad52e04.d: /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/lib.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/generator.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/id.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/machine_id.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/pid.rs
+
+/Users/wangweichun/Desktop/Study/Rust/Axum/axum-template/target/debug/deps/libxid-303d36746ad52e04.rlib: /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/lib.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/generator.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/id.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/machine_id.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/pid.rs
+
+/Users/wangweichun/Desktop/Study/Rust/Axum/axum-template/target/debug/deps/libxid-303d36746ad52e04.rmeta: /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/lib.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/generator.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/id.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/machine_id.rs /Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/pid.rs
+
+/Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/lib.rs:
+/Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/generator.rs:
+/Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/id.rs:
+/Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/machine_id.rs:
+/Users/wangweichun/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xid-1.1.1/src/pid.rs:

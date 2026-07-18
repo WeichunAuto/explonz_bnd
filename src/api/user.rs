@@ -16,5 +16,5 @@
 //             "/update_user_ws_by_id/{id}/{ws_id}",
 //             patch(user::update_ws_by_id),
 //         )
-//         .route("/delete_user_by_id/{id}", delete(user::delete_by_id))
+        // .route("/delete_user_by_id/{id}", delete(user::delete_by_id))
 // }

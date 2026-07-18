@@ -44,19 +44,19 @@
 // }
 
 // /// delete user by id
-// // #[tracing::instrument(name = "delete_user_by_id", skip(db))]
-// // pub(crate) async fn delete_by_id(
-// //     State(AppState { db }): State<AppState>,
-// //     Path(id): Path<u64>,
-// // ) -> ApiResponse<()> {
-// //     let rt = users::Entity::delete_by_id(id as i64).exec(&db).await;
+// #[tracing::instrument(name = "delete_user_by_id", skip(db))]
+// pub(crate) async fn delete_by_id(
+//     State(AppState { db }): State<AppState>,
+//     Path(id): Path<u64>,
+// ) -> ApiResponse<()> {
+//     let rt = users::Entity::delete_by_id(id as i64).exec(&db).await;
 
 // //     match rt {
 // //         Ok(deleted_user) => {
 // //             if deleted_user.rows_affected > 0 {
 // //                 tracing::info!("User was deleted successfully with id = : {:?}!", id);
-// //                 ApiResponse::success("User was deleted successfully!", None)
-// //             } else {
+//                 ApiResponse::success("User was deleted successfully!", None)
+//             } else {
 // //                 tracing::error!("When delete the user, with id = : {:?} not found", id);
 // //                 ApiResponse::error(format!("User with id = : {:?} not found", id))
 // //             }
@@ -68,41 +68,41 @@
 // //     }
 // // }
 
-// // /// update user ws_id by id
-// // #[tracing::instrument(name = "update_ws_by_id", skip(state))]
-// // pub(crate) async fn update_ws_by_id(
-// //     State(state): State<AppState>,
-// //     Path((id, ws_id)): Path<(u64, u64)>,
-// // ) -> ApiResponse<Model> {
-// //     let db = state.db();
+// / update user ws_id by id
+// #[tracing::instrument(name = "update_ws_by_id", skip(state))]
+// pub(crate) async fn update_ws_by_id(
+//     State(state): State<AppState>,
+//     Path((id, ws_id)): Path<(u64, u64)>,
+// ) -> ApiResponse<Model> {
+//     let db = state.db();
 
-// //     let rt = users::Entity::update(users::ActiveModel {
-// //         id: Set(id as i64),
-// //         ws_id: Set(ws_id as i64),
-// //         ..Default::default()
-// //     })
-// //     .exec(db)
-// //     .await;
+//     let rt = users::Entity::update(users::ActiveModel {
+//         id: Set(id as i64),
+//         ws_id: Set(ws_id as i64),
+//         ..Default::default()
+//     })
+//     .exec(db)
+//     .await;
 
-// //     match rt {
-// //         Ok(user) => {
-// //             tracing::info!(
-// //                 "user updated successfully with id = : {:?}, name = : {:?}",
-// //                 user.id,
-// //                 user.fullname
-// //             );
-// //             ApiResponse::success("User updated successfully!", Some(user))
-// //         }
-// //         Err(DbErr::RecordNotUpdated) => {
-// //             tracing::error!("User id: {} not found", id);
-// //             ApiResponse::error(format!("User id: {} not found", id))
-// //         }
-// //         Err(e) => {
-// //             tracing::error!("error updating user: {:?}", e);
-// //             ApiResponse::error(format!("error updating user: {:?}", e))
-// //         }
-// //     }
-// // }
+//     match rt {
+//         Ok(user) => {
+//             tracing::info!(
+//                 "user updated successfully with id = : {:?}, name = : {:?}",
+//                 user.id,
+//                 user.fullname
+//             );
+//             ApiResponse::success("User updated successfully!", Some(user))
+//         }
+//         Err(DbErr::RecordNotUpdated) => {
+//             tracing::error!("User id: {} not found", id);
+//             ApiResponse::error(format!("User id: {} not found", id))
+//         }
+//         Err(e) => {
+//             tracing::error!("error updating user: {:?}", e);
+//             ApiResponse::error(format!("error updating user: {:?}", e))
+//         }
+//     }
+// }
 
 // /// create user
 // #[tracing::instrument(name="create_user", skip(state), fields(user_data = %user_data))]

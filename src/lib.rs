@@ -13,6 +13,7 @@ pub mod logger;
 pub mod middleware;
 pub mod request;
 pub mod response;
+pub mod service;
 
 /// initialize all settings for logger and database
 pub async fn init_all_settings() -> anyhow::Result<DatabaseConnection> {

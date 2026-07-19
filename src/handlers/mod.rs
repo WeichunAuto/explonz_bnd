@@ -2,6 +2,7 @@ use crate::error::ApiError;
 
 pub(crate) mod user;
 pub(crate) mod workspace;
+// pub mod auth;
 
 /// Index handler
 ///
@@ -16,6 +17,6 @@ pub(crate) async fn index() -> &'static str {
 /// when no other api match the incoming request.
 /// It returns a `404 Not Found` status with a simple error message.
 pub(crate) async fn fallback() -> ApiError {
-    tracing::warn!("No route matched");
+    tracing::warn!("Goes into fallback, no route matched");
     ApiError::NotFoundError
 }

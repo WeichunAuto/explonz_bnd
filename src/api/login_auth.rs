@@ -5,10 +5,11 @@ use crate::entity::user_auth_providers;
 use crate::entity::{prelude::*, refresh_tokens};
 use crate::error::ApiError;
 use crate::middleware::get_auth_layer;
-use crate::request::BValidJson;
+use crate::request::{BJson, BValidJson};
 use crate::response::{ApiResponse, ApiResult};
 use axum::extract::{ConnectInfo, Path, State};
 use axum::routing::{get, patch, post};
+use axum::Json;
 use axum::{debug_handler, Extension, Router};
 use chrono::{DateTime, Utc};
 use sea_orm::sqlx::types::chrono;
@@ -27,6 +28,11 @@ pub struct LoginParams {
     ))]
     email: String,
     password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GoogleLoginParams {
+    id_token: String,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -59,7 +65,8 @@ pub(crate) fn routes() -> Router<AppState> {
     Router::new()
         .route("/get_user_info", get(get_user_info))
         .route_layer(get_auth_layer())
-        .route("/login", post(login))
+        .route("/login_with_email", post(login_with_email))
+        .route("/login_with_google", post(login_with_google))
         .route("/logout/{token_hash}", patch(logout))
 }
 
@@ -98,13 +105,24 @@ pub async fn logout(
 }
 
 #[debug_handler]
-#[tracing::instrument(name = "login", skip_all, fields(account = %email, IP = %addr))]
-pub async fn login(
+#[tracing::instrument(name = "login_with_google", skip_all, fields(account = %id_token, IP = %addr))]
+pub async fn login_with_google(
+    State(AppState { db }): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(GoogleLoginParams { id_token }): Json<GoogleLoginParams>,
+) -> ApiResult<LoginResponse> {
+    tracing::info!("start login with google, id_token: {}", id_token);
+    Ok(ApiResponse::success("login success", None))
+}
+
+#[debug_handler]
+#[tracing::instrument(name = "login_with_email", skip_all, fields(account = %email, IP = %addr))]
+pub async fn login_with_email(
     State(AppState { db }): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     BValidJson(LoginParams { email, password }): BValidJson<LoginParams>,
 ) -> ApiResult<LoginResponse> {
-    tracing::info!("start login, account: {}", email);
+    tracing::info!("start login with email, email: {}", email);
 
     // 1. 单条 SQL：JOIN + pgcrypto crypt 验证，一步完成
     let sql = r#"

@@ -1,1 +1,0 @@
-impl std::future::Future<Output = Result<std::option::Option<<SelectModel<LoginParams> as SelectorTrait>::Item>, sea_orm::DbErr>>

@@ -8,9 +8,9 @@ use sea_orm::{ActiveEnum, ActiveModelTrait};
 use sha2::{Digest, Sha256};
 
 use crate::api::auth::dto::UserForResponse;
-use crate::auth::{get_jwt, Principal};
 use crate::entity::prelude::*;
 use crate::entity::user_auth_providers;
+use crate::infrastructure::auth::{Principal, get_jwt};
 use crate::{
     api::auth::dto::{LoginResponse, LoginUser},
     entity::refresh_tokens,

@@ -1,10 +1,10 @@
 use crate::api::auth::dto::GoogleLoginParams;
+use crate::infrastructure::auth::Principal;
 use crate::response::ApiResponse;
 use crate::service::auth::{login_with_email_service, logout_service};
 use crate::{
     api::auth::dto::{LoginParams, LoginResponse},
     application::AppState,
-    auth::Principal,
     request::BValidJson,
     response::ApiResult,
 };

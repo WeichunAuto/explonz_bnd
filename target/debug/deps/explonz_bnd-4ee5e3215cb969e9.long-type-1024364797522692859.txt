@@ -1,1 +1,0 @@
-impl std::future::Future<Output = Result<ApiResponse<LoginResponse>, ApiError>>: Handler<_, _>

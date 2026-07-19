@@ -1,5 +1,6 @@
 use crate::config::AppConfig;
-use crate::{database, logger};
+use crate::database;
+use crate::infrastructure::logger;
 use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::Response;
 use axum::Router;

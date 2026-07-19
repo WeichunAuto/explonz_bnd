@@ -1,5 +1,7 @@
-use crate::auth::{get_jwt, Jwt};
-use crate::error::ApiError;
+use crate::{
+    error::ApiError,
+    infrastructure::auth::{get_jwt, Jwt},
+};
 use axum::body::Body;
 use http::{header, Request, Response};
 use std::future::Future;

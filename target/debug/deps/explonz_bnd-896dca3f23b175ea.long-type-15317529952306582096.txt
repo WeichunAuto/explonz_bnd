@@ -1,2 +1,0 @@
-fn(axum::extract::State<AppState>, ConnectInfo<std::net::SocketAddr>, JsonValue) -> impl std::future::Future<Output = Result<ApiResponse<LoginResponse>, ApiError>> {login_auth::login_with_google}
-fn(axum::extract::State<AppState>, ConnectInfo<std::net::SocketAddr>, JsonValue) -> impl std::future::Future<Output = Result<ApiResponse<LoginResponse>, ApiError>> {login_auth::login_with_google}: Handler<_, _>

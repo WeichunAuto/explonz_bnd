@@ -1,7 +1,7 @@
 use crate::api::auth::dto::GoogleLoginParams;
 use crate::infrastructure::auth::Principal;
 use crate::response::ApiResponse;
-use crate::service::auth::{login_with_email_service, logout_service};
+use crate::service::auth::{login_with_email_service, login_with_google_service, logout_service};
 use crate::{
     api::auth::dto::{LoginParams, LoginResponse},
     application::AppState,
@@ -28,7 +28,10 @@ pub async fn login_with_google(
         addr,
         id_token
     );
-    Ok(ApiResponse::success("login success", None))
+    let google_response = login_with_google_service(&id_token, &db).await?;
+    tracing::info!("google response is : {:?}", google_response);
+
+    Ok(ApiResponse::success("login success", Some(google_response)))
 }
 
 // 邮箱 登录

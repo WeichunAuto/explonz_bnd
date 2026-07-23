@@ -43,3 +43,15 @@ pub struct LoginResponse {
     pub refresh_token_expires_at: u64,
     pub user: UserForResponse,
 }
+
+// Google Token Payload
+#[derive(Debug, Deserialize)]
+pub struct GoogleTokenResponse {
+    pub sub: String,
+    pub email: String,
+    pub email_verified: String,
+    pub name: Option<String>,
+    pub picture: Option<String>,
+    pub aud: String,
+    pub iss: String,
+}

@@ -4,20 +4,20 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'axum_template'",
+            "name": "Debug unit tests in library 'explonz_bnd'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=axum_template"
+                    "--package=explonz_bnd"
                 ],
                 "filter": {
-                    "name": "axum_template",
+                    "name": "explonz_bnd",
                     "kind": "lib"
                 }
             },
@@ -27,15 +27,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'axum_template'",
+            "name": "Debug executable 'explonz_bnd'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=axum_template",
-                    "--package=axum_template"
+                    "--bin=explonz_bnd",
+                    "--package=explonz_bnd"
                 ],
                 "filter": {
-                    "name": "axum_template",
+                    "name": "explonz_bnd",
                     "kind": "bin"
                 }
             },
@@ -45,16 +45,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'axum_template'",
+            "name": "Debug unit tests in executable 'explonz_bnd'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=axum_template",
-                    "--package=axum_template"
+                    "--bin=explonz_bnd",
+                    "--package=explonz_bnd"
                 ],
                 "filter": {
-                    "name": "axum_template",
+                    "name": "explonz_bnd",
                     "kind": "bin"
                 }
             },

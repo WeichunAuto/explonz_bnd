@@ -19,3 +19,8 @@ pool:
   read_timeout: 20 # seconds
   idle_timeout: 300 # seconds
   max_lifetime: 24 # hours
+
+email:
+  sender: "onboarding@resend.dev"
+  password: "WW_33_cc163!"
+  api_key: "re_2HfjBWxb_FyURYoMqgzR4wBNHKJ4LA7L5"

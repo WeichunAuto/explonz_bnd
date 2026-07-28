@@ -13,6 +13,15 @@ pub struct LoginParams {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+pub struct signUpParams {
+    #[validate(custom(
+        function = "crate::request::is_email_valid",
+        message = "invalid email format, please check."
+    ))]
+    pub email: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct GoogleLoginParams {
     pub id_token: String,

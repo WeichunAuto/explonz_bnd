@@ -39,6 +39,12 @@ pub enum ApiError {
 
     #[error("UnAuthorized Error: {0}")]
     UnAuthenticatedError(String),
+
+    #[error("Email already registered.")]
+    EmailAlreadyRegistered,
+
+    #[error("Email was sent too many times.")]
+    TooManySendTimes,
 }
 
 impl ApiError {
@@ -54,6 +60,8 @@ impl ApiError {
             | ApiError::JsonError(_)
             | ApiError::ValidationError(_) => StatusCode::BAD_REQUEST,
             ApiError::JWTError(_) | ApiError::UnAuthenticatedError(_) => StatusCode::UNAUTHORIZED,
+            ApiError::EmailAlreadyRegistered => StatusCode::CONFLICT,
+            ApiError::TooManySendTimes => StatusCode::TOO_MANY_REQUESTS,
         }
     }
 }

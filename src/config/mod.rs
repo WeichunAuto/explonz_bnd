@@ -1,5 +1,6 @@
 pub(crate) use crate::config::database::DbConfig;
 use crate::config::database::DbPoolConfig;
+use crate::config::email::EmailConfig;
 use crate::config::server::ServerConfig;
 use anyhow::{Context, Result};
 use config::{Config, FileFormat};
@@ -7,9 +8,9 @@ use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::LazyLock;
 
-pub mod server;
-
 pub mod database;
+pub mod email;
+pub mod server;
 
 /// Lazily initialized global application configuration.
 ///
@@ -22,6 +23,7 @@ pub struct AppConfig {
     server: ServerConfig,
     database: DbConfig,
     pool: DbPoolConfig,
+    email: EmailConfig,
 }
 impl AppConfig {
     /// Loads configuration from multiple sources with the following priority:
@@ -79,6 +81,10 @@ impl AppConfig {
     /// Returns the database pool configuration.
     pub fn pool(&self) -> &DbPoolConfig {
         &self.pool
+    }
+
+    pub fn email(&self) -> &EmailConfig {
+        &self.email
     }
 }
 

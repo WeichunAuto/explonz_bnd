@@ -1,0 +1,2 @@
+fn(axum::extract::State<AppState>, BValidJson<signUpParams>) -> impl std::future::Future<Output = Result<ApiResponse<()>, ApiError>> {api::auth::handler::send_code}
+fn(axum::extract::State<AppState>, BValidJson<signUpParams>) -> impl std::future::Future<Output = Result<ApiResponse<()>, ApiError>> {api::auth::handler::send_code}: Handler<_, _>

@@ -1,17 +1,22 @@
 use anyhow::{anyhow, bail};
+use askama::Template;
+use rand::RngExt;
 use sea_orm::ActiveValue::{NotSet, Set};
 use sea_orm::{
     sea_query::Expr, sqlx::types::chrono::Utc, ColumnTrait, DatabaseConnection, DbBackend,
     EntityTrait, FromQueryResult, QueryFilter, Statement,
 };
-use sea_orm::{ActiveEnum, ActiveModelTrait, TransactionTrait};
+use sea_orm::{ActiveEnum, ActiveModelTrait, ConnectionTrait, DatabaseBackend, TransactionTrait};
 use sha2::{Digest, Sha256};
 
 use crate::api::auth::dto::{GoogleTokenResponse, UserForResponse};
+use crate::config::AppConfig;
 use crate::entity::sea_orm_active_enums::AuthProviderType;
 use crate::entity::user_auth_providers;
 use crate::entity::{prelude::*, users};
+use crate::error::ApiError;
 use crate::infrastructure::auth::{get_jwt, Principal};
+use crate::service::email::VerifyEmailTemplate;
 use crate::{
     api::auth::dto::{LoginResponse, LoginUser},
     entity::refresh_tokens,
@@ -19,6 +24,9 @@ use crate::{
 
 use chrono::DateTime;
 use sea_orm::sqlx::types::chrono;
+
+use resend_rs::types::CreateEmailBaseOptions;
+use resend_rs::{Resend, Result};
 
 // Google OAuth2 的验证请求URL
 const GOOGLE_OAUTH2_URL: &str = "https://oauth2.googleapis.com/tokeninfo";
@@ -164,6 +172,126 @@ pub async fn login_with_email_service(
     })?;
 
     construct_login_response(&login_user, db).await
+}
+
+pub async fn check_email_not_exists_service(
+    db: &DatabaseConnection,
+    email: &str,
+) -> anyhow::Result<bool> {
+    let sql = r#"
+        SELECT u.id, u.nickname, u.avatar_url, u.email
+        FROM users u
+        JOIN user_auth_providers uap ON uap.user_id = u.id
+        WHERE u.email = $1
+        LIMIT 1
+    "#;
+
+    let user = LoginUser::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        sql,
+        [email.into()],
+    ))
+    .one(db)
+    .await?;
+
+    match user {
+        Some(_) => {
+            tracing::warn!("email already exists: {}", email);
+            Ok(false)
+        }
+        None => Ok(true),
+    }
+}
+
+// 同一 email 在有效期内的累计发送次数；是否超过 5 次
+pub async fn too_many_sends_service(db: &DatabaseConnection, email: &str) -> anyhow::Result<bool> {
+    let sql = r#"
+        SELECT EXISTS(
+                SELECT 1
+                FROM sign_up_otps
+                WHERE email = $1
+                  AND expires_at > NOW()
+                  AND sent_count >= 5
+            ) AS too_many
+    "#;
+    let result = db
+        .query_one(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            sql,
+            vec![email.into()],
+        ))
+        .await?;
+    let too_many = result.unwrap().try_get::<bool>("", "too_many")?;
+
+    if too_many {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+// 生成六位 OTP CODE, 并入库
+pub async fn generate_otp_code_service(
+    db: &DatabaseConnection,
+    email: &str,
+) -> anyhow::Result<String> {
+    let opt_code = {
+        let mut rng = rand::rng(); // rng 离开作用域后就被Drop
+        format!("{:06}", rng.random_range(0..1_000_000))
+    };
+
+    let sql = r#"
+        INSERT INTO sign_up_otps
+        (
+            email, code, otp_token, attempts, sent_count, expires_at
+        )
+        VALUES ($1, $2, NULL, 0, 1, NOW() + INTERVAL '10 minutes')
+
+        ON CONFLICT(email)
+
+        DO UPDATE SET
+            code = EXCLUDED.code,
+            otp_token = NULL,
+            attempts = 0,
+            sent_count =
+                sign_up_otps.sent_count + 1,
+            expires_at =
+                EXCLUDED.expires_at,
+            updated_at =
+                NOW()
+        "#;
+
+    db.execute(Statement::from_sql_and_values(
+        DatabaseBackend::Postgres,
+        sql,
+        vec![email.into(), opt_code.clone().into()],
+    ))
+    .await?;
+
+    Ok(opt_code)
+}
+
+// 发送电子邮件
+pub async fn send_email_service(email: &str, code: &str) -> anyhow::Result<bool> {
+    let app_config = AppConfig::get().email();
+
+    let resend = Resend::new(app_config.get_api_key());
+
+    let from = app_config.get_sender();
+    let to = [email];
+    let subject = "Please Verify Your Email";
+
+    let html = VerifyEmailTemplate {
+        code,
+        expire_minutes: 10,
+    }
+    .render()?;
+
+    let email = CreateEmailBaseOptions::new(from, to, subject).with_html(&html);
+
+    let _email = resend.emails.send(email).await?;
+
+    Ok(true)
 }
 
 // 构建登录响应结构数据

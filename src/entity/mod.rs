@@ -4,5 +4,6 @@ pub mod prelude;
 
 pub mod refresh_tokens;
 pub mod sea_orm_active_enums;
+pub mod sign_up_otps;
 pub mod user_auth_providers;
 pub mod users;

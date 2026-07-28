@@ -1,1 +1,0 @@
-cargo:rustc-env=MIME_TYPES_GENERATED_PATH=/Users/wangweichun/Desktop/Project/Explonz/dev/explonz_bnd/target/debug/build/mime_guess-289d69980cb77199/out/mime_types_generated.rs

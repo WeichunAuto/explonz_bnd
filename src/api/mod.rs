@@ -6,8 +6,6 @@ use axum::Router;
 
 pub mod auth;
 pub(crate) mod user;
-mod workspace;
-
 /// Creates and configures the application API routes.
 pub async fn build_routes() -> Router<AppState> {
     Router::new()

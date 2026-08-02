@@ -14,7 +14,18 @@ pub struct LoginParams {
 }
 
 #[derive(Debug, Deserialize, Validate)]
-pub struct signUpParams {
+pub struct SetupPasswordParmas {
+    #[validate(custom(
+        function = "crate::request::is_email_valid",
+        message = "invalid email format, please check."
+    ))]
+    pub email: String,
+    pub password: String,
+    pub otp_token: Uuid,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct SignUpParams {
     #[validate(custom(
         function = "crate::request::is_email_valid",
         message = "invalid email format, please check."
@@ -22,9 +33,24 @@ pub struct signUpParams {
     pub email: String,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+pub struct SignUpWithCodeParams {
+    #[validate(custom(
+        function = "crate::request::is_email_valid",
+        message = "invalid email format, please check."
+    ))]
+    pub email: String,
+    pub code: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct GoogleLoginParams {
     pub id_token: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OtpTokenResponse {
+    pub otp_token: String,
 }
 
 #[derive(Debug, FromQueryResult)]

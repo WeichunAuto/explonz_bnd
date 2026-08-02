@@ -1,10 +1,13 @@
-use crate::api::auth::dto::{signUpParams, GoogleLoginParams};
+use crate::api::auth::dto::{
+    GoogleLoginParams, OtpTokenResponse, SetupPasswordParmas, SignUpParams, SignUpWithCodeParams,
+};
 use crate::error::ApiError;
 use crate::infrastructure::auth::Principal;
 use crate::response::ApiResponse;
 use crate::service::auth::{
     check_email_not_exists_service, generate_otp_code_service, login_with_email_service,
-    login_with_google_service, logout_service, send_email_service, too_many_sends_service,
+    login_with_google_service, logout_service, send_email_service, setup_password_service,
+    too_many_sends_service, verify_otp_code_service,
 };
 use crate::{
     api::auth::dto::{LoginParams, LoginResponse},
@@ -52,14 +55,10 @@ pub async fn login_with_email(
         email
     );
 
-    // let login_response = login_with_email_service(&email, &password, &db).await?;
-
     return match login_with_email_service(&email, &password, &db).await {
         Ok(login_response) => Ok(ApiResponse::success("login success", Some(login_response))),
         Err(e) => Err(ApiError::UnAuthenticatedError(e.to_string())),
     };
-
-    // tracing::info!("login with email successfully.");
 }
 
 // 登出，根据 token_hash 将对应的 revoked_at 设置为当前时间
@@ -86,7 +85,7 @@ pub async fn logout(
 #[tracing::instrument(name = "send_code for sign up")]
 pub async fn send_code(
     State(AppState { db }): State<AppState>,
-    BValidJson(signUpParams { email }): BValidJson<signUpParams>,
+    BValidJson(SignUpParams { email }): BValidJson<SignUpParams>,
 ) -> ApiResult<()> {
     tracing::info!("Sign up: start verifying the email: {}", email);
 
@@ -104,10 +103,38 @@ pub async fn send_code(
                 send_email_service(&email, &otp_code).await?;
                 return Ok(ApiResponse::success("", None));
             }
-            // Ok(ApiResponse::success("", None))
         }
         false => Err(ApiError::EmailAlreadyRegistered),
     }
+}
+
+// 邮箱注册 校验验证码
+#[debug_handler]
+#[tracing::instrument(name = "verify otp code for sign up")]
+pub async fn verify_code(
+    State(AppState { db }): State<AppState>,
+    BValidJson(SignUpWithCodeParams { email, code }): BValidJson<SignUpWithCodeParams>,
+) -> ApiResult<OtpTokenResponse> {
+    verify_otp_code_service(&db, &email, code.as_deref().unwrap_or_default()).await
+}
+
+// 邮箱注册，设置密码
+#[debug_handler]
+pub async fn setup_password(
+    State(AppState { db }): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    BValidJson(SetupPasswordParmas {
+        email,
+        password,
+        otp_token,
+    }): BValidJson<SetupPasswordParmas>,
+) -> ApiResult<LoginResponse> {
+    tracing::info!(
+        "start sign up with email, address: {}, email: {}",
+        addr,
+        email
+    );
+    setup_password_service(&db, &email, &password, otp_token).await
 }
 
 #[debug_handler]

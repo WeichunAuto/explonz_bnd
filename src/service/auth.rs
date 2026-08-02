@@ -6,16 +6,20 @@ use sea_orm::{
     sea_query::Expr, sqlx::types::chrono::Utc, ColumnTrait, DatabaseConnection, DbBackend,
     EntityTrait, FromQueryResult, QueryFilter, Statement,
 };
-use sea_orm::{ActiveEnum, ActiveModelTrait, ConnectionTrait, DatabaseBackend, TransactionTrait};
+use sea_orm::{
+    ActiveEnum, ActiveModelTrait, Condition, ConnectionTrait, DatabaseBackend, TransactionTrait,
+};
 use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
-use crate::api::auth::dto::{GoogleTokenResponse, UserForResponse};
+use crate::api::auth::dto::{GoogleTokenResponse, OtpTokenResponse, UserForResponse};
 use crate::config::AppConfig;
 use crate::entity::sea_orm_active_enums::AuthProviderType;
-use crate::entity::user_auth_providers;
 use crate::entity::{prelude::*, users};
+use crate::entity::{sign_up_otps, user_auth_providers};
 use crate::error::ApiError;
 use crate::infrastructure::auth::{get_jwt, Principal};
+use crate::response::{ApiResponse, ApiResult};
 use crate::service::email::VerifyEmailTemplate;
 use crate::{
     api::auth::dto::{LoginResponse, LoginUser},
@@ -224,6 +228,10 @@ pub async fn too_many_sends_service(db: &DatabaseConnection, email: &str) -> any
     let too_many = result.unwrap().try_get::<bool>("", "too_many")?;
 
     if too_many {
+        tracing::warn!(
+            "Too many attempts of sending otp code, the email is: {}",
+            email
+        );
         Ok(true)
     } else {
         Ok(false)
@@ -240,12 +248,20 @@ pub async fn generate_otp_code_service(
         format!("{:06}", rng.random_range(0..1_000_000))
     };
 
+    let validity_minutes: i32 = AppConfig::get()
+        .email()
+        .get_otp_code_validity_time()
+        .parse()
+        .map_err(|_| {
+            ApiError::InternalError(anyhow!("Invalid OTP validity time configuration."))
+        })?;
+
     let sql = r#"
         INSERT INTO sign_up_otps
         (
             email, code, otp_token, attempts, sent_count, expires_at
         )
-        VALUES ($1, $2, NULL, 0, 1, NOW() + INTERVAL '10 minutes')
+        VALUES ($1, $2, NULL, 0, 1, NOW() + ($3 * INTERVAL '1 minute'))
 
         ON CONFLICT(email)
 
@@ -264,7 +280,11 @@ pub async fn generate_otp_code_service(
     db.execute(Statement::from_sql_and_values(
         DatabaseBackend::Postgres,
         sql,
-        vec![email.into(), opt_code.clone().into()],
+        vec![
+            email.into(),
+            opt_code.clone().into(),
+            validity_minutes.into(),
+        ],
     ))
     .await?;
 
@@ -273,11 +293,11 @@ pub async fn generate_otp_code_service(
 
 // 发送电子邮件
 pub async fn send_email_service(email: &str, code: &str) -> anyhow::Result<bool> {
-    let app_config = AppConfig::get().email();
+    let email_config = AppConfig::get().email();
 
-    let resend = Resend::new(app_config.get_api_key());
+    let resend = Resend::new(email_config.get_api_key());
 
-    let from = app_config.get_sender();
+    let from = email_config.get_sender();
     let to = [email];
     let subject = "Please Verify Your Email";
 
@@ -292,6 +312,195 @@ pub async fn send_email_service(email: &str, code: &str) -> anyhow::Result<bool>
     let _email = resend.emails.send(email).await?;
 
     Ok(true)
+}
+
+// 邮箱注册 校验验证码
+pub async fn verify_otp_code_service(
+    db: &DatabaseConnection,
+    email: &str,
+    code: &str,
+) -> ApiResult<OtpTokenResponse> {
+    tracing::info!("verify otp code, email: {}, code: {}", email, code);
+
+    // 1. 查询 sign_up_otps WHERE email = $1 AND expires_at > NOW()
+    let conditions = Condition::all()
+        .add(sign_up_otps::Column::Email.eq(email))
+        .add(sign_up_otps::Column::ExpiresAt.gt(Utc::now().naive_utc()));
+
+    let otp = sign_up_otps::Entity::find()
+        .filter(conditions)
+        .one(db)
+        .await?;
+
+    let attempts = AppConfig::get()
+        .email()
+        .get_attempts()
+        .parse::<i16>()
+        .map_err(|_| ApiError::BizError("Invalid OTP code attempts config".to_string()))?;
+
+    return match otp {
+        Some(otp) => {
+            if otp.attempts > attempts {
+                tracing::warn!("Too many attempts, please try later.");
+                Err(ApiError::ValidationError(
+                    "Too many attempts, please try later.".to_string(),
+                ))
+            } else if otp.code.as_deref() != Some(code) {
+                // attempts + 1
+                let mut active_model: sign_up_otps::ActiveModel = otp.into();
+                active_model.attempts = Set(active_model.attempts.unwrap() + 1);
+                active_model.update(db).await?;
+
+                tracing::warn!("Incorrect otp code: {}.", code);
+                Err(ApiError::ValidationError("Incorrect otp code.".to_string()))
+            } else {
+                // 通过，生成 opt_token
+                let otp_token = Uuid::new_v4();
+
+                // opt_token 入库
+                let mut active_model: sign_up_otps::ActiveModel = otp.into();
+                active_model.otp_token = Set(Some(otp_token));
+                active_model.update(db).await?;
+
+                Ok(ApiResponse::success(
+                    "success",
+                    Some(OtpTokenResponse {
+                        otp_token: otp_token.to_string(),
+                    }),
+                ))
+            }
+        }
+        None => Err(ApiError::ValidationError(
+            "email is not exists or expired.".to_string(),
+        )),
+    };
+}
+
+// 邮箱注册，设置密码
+pub async fn setup_password_service(
+    db: &DatabaseConnection,
+    email: &str,
+    password: &str,
+    otp_token: Uuid,
+) -> ApiResult<LoginResponse> {
+    // 1. 查询 sign_up_otps WHERE email = $1 AND expires_at > NOW()
+    let conditions = Condition::all()
+        .add(sign_up_otps::Column::OtpToken.eq(otp_token))
+        .add(sign_up_otps::Column::ExpiresAt.gt(Utc::now().naive_utc()));
+
+    let otp = sign_up_otps::Entity::find()
+        .filter(conditions)
+        .one(db)
+        .await?;
+
+    return match otp {
+        Some(otp) => {
+            // 邮件可能已被篡改
+            if otp.email.ne(email) {
+                Err(ApiError::ValidationError("Email is not valid.".to_string()))
+            }
+            // 正常逻辑分支
+            else {
+                // 1. 再次检查 users 表 email 是否已存在（防并发重复）→ 返回 409
+                let email_exists = check_email_exists_in_users(db, email).await?;
+                if email_exists {
+                    Err(ApiError::EmailAlreadyRegistered)
+                } else {
+                    // 2. 写入用户信息
+                    let login_user = sign_up_users(db, email, password, otp.id).await?;
+
+                    // 3. 构建并返回响应
+                    let login_response = construct_login_response(&login_user, db).await?;
+                    Ok(ApiResponse::success("", Some(login_response)))
+                }
+            }
+        }
+        // otp token 不存在或已过期
+        None => {
+            tracing::warn!("Otp token is not exists or expired.");
+            Err(ApiError::ValidationError(
+                "Otp token is not exists or expired.".to_string(),
+            ))
+        }
+    };
+}
+
+// 写入注册用户的信息
+async fn sign_up_users(
+    db: &DatabaseConnection,
+    email: &str,
+    password: &str,
+    sign_up_id: Uuid,
+) -> anyhow::Result<LoginUser> {
+    // 1. 开启事务
+    let transaction = db.begin().await?;
+
+    // 2. 创建 Users
+    let user = users::ActiveModel {
+        nickname: Set(String::from("Unknow")),
+        email: Set(Some(String::from(email))),
+        ..Default::default()
+    }
+    .insert(&transaction)
+    .await?;
+    tracing::info!("User created successfully.");
+
+    // 3. 创建 provider
+    let sql = r#"
+        INSERT INTO user_auth_providers
+        (
+            user_id,
+            provider,
+            password_hash
+        )
+        VALUES
+        (
+            $1,
+            $2::auth_provider_type,
+            crypt($3, gen_salt('bf'))
+        )
+        "#;
+    transaction
+        .execute(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            sql,
+            vec![
+                user.id.into(),
+                AuthProviderType::Email.into(),
+                password.into(),
+            ],
+        ))
+        .await?;
+    tracing::info!("Auth provider created successfully.");
+
+    // 4. 注册成功后删除整行记录
+    sign_up_otps::Entity::delete_by_id(sign_up_id)
+        .exec(&transaction)
+        .await?;
+    tracing::info!("Sign up token record deleted successfully.");
+
+    // 提交事务
+    transaction.commit().await?;
+
+    tracing::info!("Email: {}, Sign up successfully.", email);
+
+    Ok(LoginUser {
+        id: user.id,
+        nickname: user.nickname,
+        avatar_url: user.avatar_url,
+        email: user.email,
+    })
+}
+
+// 检查 email 在 users表中是否存在
+async fn check_email_exists_in_users(db: &DatabaseConnection, email: &str) -> anyhow::Result<bool> {
+    let conditions = Condition::all().add(users::Column::Email.eq(email));
+    let user = users::Entity::find().filter(conditions).one(db).await?;
+
+    match user {
+        Some(_) => Ok(true),
+        None => Ok(false),
+    }
 }
 
 // 构建登录响应结构数据

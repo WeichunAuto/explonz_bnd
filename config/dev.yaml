@@ -1,6 +1,6 @@
 server:
   host: "192.168.68.50"
-  # host: "192.168.0.141"
+  # host: "192.168.183.80"
   port: 3005
 
 database:
@@ -23,4 +23,6 @@ pool:
 email:
   sender: "onboarding@resend.dev"
   password: "WW_33_cc163!"
-  api_key: "re_2HfjBWxb_FyURYoMqgzR4wBNHKJ4LA7L5"
+  api_key: ""
+  attempts: "5"  # otp code 最多可以尝试的次数
+  otp_code_validity_time: "2"  # otp code 的有效时间（分钟）

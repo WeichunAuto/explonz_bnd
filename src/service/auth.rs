@@ -7,7 +7,8 @@ use sea_orm::{
     EntityTrait, FromQueryResult, QueryFilter, Statement,
 };
 use sea_orm::{
-    ActiveEnum, ActiveModelTrait, Condition, ConnectionTrait, DatabaseBackend, TransactionTrait,
+    ActiveEnum, ActiveModelTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseTransaction,
+    TransactionTrait,
 };
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -15,6 +16,7 @@ use uuid::Uuid;
 use crate::api::auth::dto::{GoogleTokenResponse, OtpTokenResponse, UserForResponse};
 use crate::config::AppConfig;
 use crate::entity::sea_orm_active_enums::AuthProviderType;
+use crate::entity::users::Model;
 use crate::entity::{prelude::*, users};
 use crate::entity::{sign_up_otps, user_auth_providers};
 use crate::error::ApiError;
@@ -92,7 +94,7 @@ pub async fn login_with_google_service(
             user
         }
         None => {
-            tracing::info!("用户不存在，开始创建用户");
+            // email 未被注册，创建新用户
             let user = create_google_user(&token_response, db).await?;
             tracing::info!("用户不存在，已创建用户：{:?}", user);
             LoginUser {
@@ -107,6 +109,22 @@ pub async fn login_with_google_service(
     construct_login_response(&login_user, db).await
 }
 
+// 检查Google 账号的邮箱是否之前被注册过
+async fn is_google_email_signed_up(
+    db: &DatabaseTransaction,
+    email: &str,
+) -> anyhow::Result<Option<users::Model>> {
+    let user_opt = users::Entity::find()
+        .filter(users::Column::Email.eq(email))
+        .one(db)
+        .await?;
+
+    match user_opt {
+        Some(user) => Ok(Some(user)),
+        None => Ok(None),
+    }
+}
+
 // 使用 Google的token response 创建账号
 async fn create_google_user(
     token_response: &GoogleTokenResponse,
@@ -115,15 +133,23 @@ async fn create_google_user(
     // 1. 开启事务
     let transaction = db.begin().await?;
 
-    // 2. 创建 Users
-    let user = users::ActiveModel {
-        nickname: Set(token_response.name.clone().unwrap_or("-".to_string())),
-        avatar_url: Set(token_response.picture.clone()),
-        email: Set(Some(token_response.email.clone())),
-        ..Default::default()
+    let user: users::Model;
+
+    // 检查Google的email是否被注册过？
+    if let Some(exist_user) = is_google_email_signed_up(&transaction, &token_response.email).await?
+    {
+        user = exist_user;
+    } else {
+        user = users::ActiveModel {
+            nickname: Set(token_response.name.clone().unwrap_or("-".to_string())),
+            avatar_url: Set(token_response.picture.clone()),
+            email: Set(Some(token_response.email.clone())),
+            ..Default::default()
+        }
+        .insert(&transaction)
+        .await?
+        .into();
     }
-    .insert(&transaction)
-    .await?;
 
     // 3. 创建 provider
     user_auth_providers::ActiveModel {

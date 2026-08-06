@@ -2,8 +2,18 @@
 
 pub mod prelude;
 
+pub mod post_bookmarks;
+pub mod post_likes;
+pub mod post_photos;
+pub mod posts;
 pub mod refresh_tokens;
 pub mod sea_orm_active_enums;
+pub mod seasonal_pickings;
 pub mod sign_up_otps;
+pub mod spot_opening_hours;
+pub mod spots;
+pub mod tip_votes;
+pub mod tips;
 pub mod user_auth_providers;
+pub mod user_saved_spots;
 pub mod users;

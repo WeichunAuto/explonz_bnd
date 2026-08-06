@@ -23,30 +23,6 @@ pub enum GenderType {
     #[sea_orm(string_value = "prefer_not_to_say")]
     PreferNotToSay,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "post_type_enum")]
-pub enum PostTypeEnum {
-    #[sea_orm(string_value = "standard")]
-    Standard,
-    #[sea_orm(string_value = "comment")]
-    Comment,
-    #[sea_orm(string_value = "repost")]
-    Repost,
-}
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(
-    rs_type = "String",
-    db_type = "Enum",
-    enum_name = "user_badge_type_enum"
-)]
-pub enum UserBadgeTypeEnum {
-    #[sea_orm(string_value = "local_legend")]
-    LocalLegend,
-    #[sea_orm(string_value = "explorer")]
-    Explorer,
-    #[sea_orm(string_value = "contributor")]
-    Contributor,
-}
 
 /// Convert `GenderType` to `ActiveValue`
 impl IntoActiveValue<GenderType> for GenderType {
@@ -58,18 +34,6 @@ impl IntoActiveValue<GenderType> for GenderType {
 /// Convert `AuthProviderType` to `ActiveValue`
 impl IntoActiveValue<AuthProviderType> for AuthProviderType {
     fn into_active_value(self) -> sea_orm::ActiveValue<AuthProviderType> {
-        sea_orm::ActiveValue::Set(self)
-    }
-}
-
-impl IntoActiveValue<UserBadgeTypeEnum> for UserBadgeTypeEnum {
-    fn into_active_value(self) -> sea_orm::ActiveValue<UserBadgeTypeEnum> {
-        sea_orm::ActiveValue::Set(self)
-    }
-}
-
-impl IntoActiveValue<PostTypeEnum> for PostTypeEnum {
-    fn into_active_value(self) -> sea_orm::ActiveValue<PostTypeEnum> {
         sea_orm::ActiveValue::Set(self)
     }
 }

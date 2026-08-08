@@ -1,3 +1,5 @@
+use std::format;
+
 use anyhow::{anyhow, bail};
 use askama::Template;
 use rand::RngExt;

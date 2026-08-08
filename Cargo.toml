@@ -1,9 +1,18 @@
+
+[workspace]
+members = [
+    ".",                 # 当前 package（api backend）
+    "explonz_shared",
+    "explonz_admin",
+]
+resolver = "2"
+
 [package]
 name = "explonz_bnd"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
+[workspace.dependencies]
 tokio = { version = "1.47.1", features = ["full"] }
 axum = { version = "0.8.4" , features = ["macros"]}
 serde = { version = "1.0.225", features = ["derive"] }
@@ -25,10 +34,56 @@ axum-valid = {version = "0.24.0", features = ["full_validator"]}
 regex = "1.12.2"
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
 bcrypt = "0.17.1"
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1", features = ["serde-float"] }
 sha2 = "0.11.0"
 hex = "0.4"
 reqwest = { version = "0.13.4", features = ["json"] }
 resend-rs = "0.28.0"
 rand = "0.10.2"
 askama = "0.16.0"
+leptos = { version = "0.8" }
+leptos_axum = { version = "0.8" }
+leptos_meta = "0.8.6"
+
+
+[[workspace.metadata.leptos]]
+name = "explonz_admin"
+bin-package = "explonz_admin"
+lib-package = "explonz_admin"
+bin-features = ["ssr"]
+lib-features = ["hydrate"]
+site-root = "target/site"
+site-pkg-dir = "pkg"
+
+[dependencies]
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
+config = { workspace = true }
+anyhow = { workspace = true }
+sea-orm = { workspace = true }
+num_cpus = { workspace = true }
+thiserror = { workspace = true }
+tower-http = { workspace = true }
+xid = { workspace = true }
+bytesize = { workspace = true }
+http = { workspace = true }
+validator = { workspace = true }
+axum-valid = { workspace = true }
+regex = { workspace = true }
+jsonwebtoken = { workspace = true }
+bcrypt = { workspace = true }
+uuid = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+reqwest = { workspace = true }
+resend-rs = { workspace = true }
+rand = { workspace = true }
+askama = { workspace = true }
+leptos_meta.workspace = true
+explonz_shared = { path = "explonz_shared", features = ["ssr"] }

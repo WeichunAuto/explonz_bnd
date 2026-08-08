@@ -1,0 +1,18 @@
+[package]
+name = "explonz_admin"
+output-name = "explonz_admin"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+style-file = "style/main.scss"
+assets-dir = "public"
+site-addr = "0.0.0.0:3006"
+reload-port = 3007
+end2end-cmd = ""
+browserquery = "defaults"
+env = "DEV"
+
+[package.bin-features]
+ssr = ["ssr"]
+
+[package.lib-features]
+hydrate = ["hydrate"]

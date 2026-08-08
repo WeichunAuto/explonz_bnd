@@ -1,0 +1,16 @@
+[package]
+name = "explonz_shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sea-orm      = { workspace = true, optional = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+validator    = { workspace = true }
+uuid         = { workspace = true }
+chrono       = { workspace = true }
+rust_decimal = { workspace = true }
+
+[features]
+ssr = ["dep:sea-orm"]

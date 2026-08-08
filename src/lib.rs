@@ -4,9 +4,9 @@ use crate::infrastructure::database;
 
 pub mod api;
 pub mod application;
-pub mod common;
+pub use explonz_shared::common;
 pub mod config;
-pub mod entity;
+pub use explonz_shared::entity;
 pub mod error;
 pub mod infrastructure;
 pub mod middleware;

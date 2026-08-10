@@ -45,7 +45,14 @@ rand = "0.10.2"
 askama = "0.16.0"
 leptos = { version = "0.8" }
 leptos_axum = { version = "0.8" }
+leptos_router = "0.8"
 leptos_meta = "0.8.6"
+tw_merge = { version = "0.1.21", features = ["variant"] }
+icons = { version = "0.18.3", features = ["leptos"] }
+leptos_ui = "0.3.22"
+strum = "0.28.0"
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+
 
 
 [[workspace.metadata.leptos]]
@@ -56,6 +63,8 @@ bin-features = ["ssr"]
 lib-features = ["hydrate"]
 site-root = "target/site"
 site-pkg-dir = "pkg"
+# style-file = "explonz_admin/style/input.css"
+tailwind-input-file = "explonz_admin/style/input.css"
 
 [dependencies]
 tokio = { workspace = true }
@@ -86,4 +95,5 @@ resend-rs = { workspace = true }
 rand = { workspace = true }
 askama = { workspace = true }
 leptos_meta.workspace = true
+
 explonz_shared = { path = "explonz_shared", features = ["ssr"] }

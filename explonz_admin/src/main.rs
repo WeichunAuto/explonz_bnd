@@ -2,9 +2,9 @@
 #[tokio::main]
 async fn main() {
     use axum::Router;
+    use explonz_admin::app::App;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
-    use explonz_admin::app::App;
 
     let conf = get_configuration(None).unwrap();
     let leptos_options = conf.leptos_options;
@@ -26,8 +26,8 @@ async fn main() {
 
 #[cfg(feature = "ssr")]
 fn shell(options: leptos::prelude::LeptosOptions) -> impl leptos::prelude::IntoView {
-    use leptos::prelude::*;
     use explonz_admin::app::App;
+    use leptos::prelude::*;
 
     view! {
         <!DOCTYPE html>

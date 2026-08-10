@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+leptos_router = { workspace = true }
 leptos         = { workspace = true }
 leptos_axum    = { workspace = true, optional = true }
 axum           = { workspace = true, optional = true }
@@ -17,6 +18,11 @@ serde          = { workspace = true }
 tracing        = { workspace = true, optional = true }
 anyhow         = { workspace = true, optional = true }
 leptos_meta = {workspace = true}
+tw_merge.workspace = true
+icons.workspace = true
+leptos_ui.workspace = true
+strum.workspace = true
+axum-extra = { workspace = true, features = ["cookie"], optional = true  }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
@@ -33,9 +39,13 @@ ssr = [
     "dep:anyhow",
     "leptos/ssr",
     "explonz_shared/ssr",
+    "dep:axum-extra",
 ]
 hydrate = ["leptos/hydrate"]
 
 [[bin]]
 name = "explonz_admin"
 required-features = ["ssr"]
+
+[package.metadata.leptos]
+tailwind-input-file = "style/input.css"

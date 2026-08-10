@@ -88,3 +88,10 @@ impl From<crate::entity::spots::Model> for SpotDto {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminUser {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+}

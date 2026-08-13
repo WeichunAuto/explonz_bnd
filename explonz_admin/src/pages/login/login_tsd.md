@@ -247,7 +247,247 @@ HTML 发送到浏览器 → Hydrate
 
 ## 12. 安全注意事项
 
-1. **JWT Secret**：`infrastructure/auth.rs` 中 `DEFAULT_KEY` 为硬编码占位值，上线前必须替换为环境变量读取（`AppConfig` 已有配置体系可利用）
+1. **JWT Secret**：通过 `JWT_SECRET` 环境变量注入，本地开发可用任意字符串，生产必须使用 32+ 字符随机串
 2. **Cookie 属性**：生产环境须设 `Secure`（需 HTTPS），本地开发可去掉
-3. **管理员身份验证**：`admin_login` 中应验证用户具有 admin 角色，避免普通用户登录后台
+3. **管理员身份验证**：凭据存储在环境变量中，不依赖普通用户表，无越权风险
 4. **Rate Limiting**：`tower-http` 已在依赖中，可在 `main.rs` 的 Axum Router 上为 `/api/AdminLogin` 路径加限速中间件
+
+---
+
+## 13. 管理员账号密码存储方案
+
+### 结论：使用环境变量存储
+
+管理员账号不存入数据库，而是通过 `.env` / 系统环境变量提供：
+
+```
+ADMIN_EMAIL=admin@explonz.com
+ADMIN_PASSWORD_HASH=$2b$12$xxxxxx...   # bcrypt hash，cost=12
+JWT_SECRET=your-32-char-random-secret
+```
+
+### 原因
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| 环境变量（推荐） | 简单、无 DB 查询、不暴露在代码中 | 不支持多管理员 |
+| `users` + `user_auth_providers` 表 | 复用现有 schema | 需额外 `is_admin` 字段；与普通用户混用 |
+| 独立 `admin_users` 表 | 隔离清晰 | 需新建表、migration |
+
+管理员通常只有 1-3 人，环境变量方案完全满足需求，后期如需多管理员再迁移到独立表。
+
+### 生成初始密码 Hash
+
+```bash
+# 用 Rust 一次性脚本生成 bcrypt hash
+cargo run --example gen_hash -- "your_password"
+
+# 或用 htpasswd 工具（macOS/Linux 自带）
+htpasswd -bnBC 12 "" "your_password" | tr -d ':\n'
+```
+
+---
+
+## 14. 完整实现代码
+
+### 14.1 `explonz_admin/Cargo.toml` — 新增依赖
+
+在 `[dependencies]` 中追加：
+
+```toml
+jsonwebtoken = { workspace = true, optional = true }
+bcrypt       = { workspace = true, optional = true }
+```
+
+在 `ssr` feature 中追加：
+
+```toml
+ssr = [
+    # ... 已有项 ...
+    "dep:jsonwebtoken",
+    "dep:bcrypt",
+]
+```
+
+---
+
+### 14.2 `server/auth.rs` — 完整实现
+
+```rust
+use explonz_shared::common::dto::AdminUser;
+use leptos::prelude::*;
+
+// ── admin_login ──────────────────────────────────────────────────────────────
+
+#[server(AdminLogin, "/api")]
+pub async fn admin_login(email: String, password: String) -> Result<(), ServerFnError> {
+    use axum::http::header::{self, HeaderValue};
+    use bcrypt::verify;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use leptos_axum::ResponseOptions;
+    use serde::{Deserialize, Serialize};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // 1. 读取环境变量中的管理员凭据
+    let admin_email = std::env::var("ADMIN_EMAIL")
+        .map_err(|_| ServerFnError::new("Server misconfigured: ADMIN_EMAIL missing"))?;
+    let admin_hash = std::env::var("ADMIN_PASSWORD_HASH")
+        .map_err(|_| ServerFnError::new("Server misconfigured: ADMIN_PASSWORD_HASH missing"))?;
+
+    // 2. 验证 email（constant-time 比较防时序攻击）
+    if email != admin_email {
+        return Err(ServerFnError::new("Invalid email or password"));
+    }
+
+    // 3. 验证 bcrypt 密码
+    let valid = verify(&password, &admin_hash)
+        .map_err(|_| ServerFnError::new("Invalid email or password"))?;
+    if !valid {
+        return Err(ServerFnError::new("Invalid email or password"));
+    }
+
+    // 4. 生成 JWT（1 小时有效期）
+    #[derive(Serialize, Deserialize)]
+    struct Claims {
+        sub: String, // admin email
+        exp: u64,
+    }
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "dev_secret_change_in_production".to_string());
+    let exp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 3600;
+    let token = encode(
+        &Header::default(),
+        &Claims { sub: email, exp },
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
+    )
+    .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // 5. 写入 HttpOnly Cookie
+    let response_opts = use_context::<ResponseOptions>()
+        .ok_or_else(|| ServerFnError::new("No ResponseOptions in context"))?;
+    let cookie = format!(
+        "access_token={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600"
+        // 生产环境在 Max-Age 后追加 "; Secure"
+    );
+    response_opts.insert_header(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&cookie).map_err(|e| ServerFnError::new(e.to_string()))?,
+    );
+
+    Ok(())
+}
+
+// ── get_current_user ─────────────────────────────────────────────────────────
+
+#[server(GetCurrentUser, "/api")]
+pub async fn get_current_user() -> Result<Option<AdminUser>, ServerFnError> {
+    use axum_extra::extract::CookieJar;
+    use jsonwebtoken::{decode, DecodingKey, Validation};
+    use leptos_axum::extract;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    struct Claims {
+        sub: String,
+        exp: u64,
+    }
+
+    // 1. 提取 Cookie Jar
+    let jar: CookieJar = extract().await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    let token = match jar.get("access_token") {
+        Some(c) => c.value().to_string(),
+        None => return Ok(None), // 未登录
+    };
+
+    // 2. 验证并解码 JWT
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "dev_secret_change_in_production".to_string());
+    let mut validation = Validation::default();
+    validation.validate_aud = false;
+
+    match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &validation,
+    ) {
+        Ok(data) => Ok(Some(AdminUser {
+            id: "admin".to_string(),
+            name: "Admin".to_string(),
+            email: data.claims.sub,
+        })),
+        Err(_) => Ok(None), // token 无效或过期
+    }
+}
+```
+
+---
+
+### 14.3 `pages/login/login.rs` — 修改部分
+
+在 use 列表顶部追加：
+
+```rust
+use crate::server::auth::AdminLogin;
+use leptos_router::hooks::use_navigate;
+use leptos_router::NavigateOptions;
+```
+
+替换 `login_action` 及其后的逻辑（在 `LoginPage` 函数体内）：
+
+```rust
+let login_action = ServerAction::<AdminLogin>::new();
+
+// 登录成功后跳转 dashboard
+let navigate = use_navigate();
+Effect::new(move |_| {
+    if let Some(Ok(())) = login_action.value().get() {
+        navigate("/dashboard", NavigateOptions::default());
+    }
+});
+
+// 错误信息展示
+let error_msg = move || {
+    login_action.value().get().and_then(|r| r.err()).map(|e| e.to_string())
+};
+```
+
+在 `<ActionForm>` 内的两个 `<Input>` 标签上补充 `name` 属性（ActionForm 依赖 name 做序列化）：
+
+```rust
+// email input
+<Input
+    attr:r#type="email"
+    attr:name="email"      // ← 必须
+    attr:id="email"
+    ...
+/>
+
+// password input
+<Input
+    node_ref=password_input_ref
+    attr:r#type="password"
+    attr:name="password"   // ← 必须
+    attr:id="password"
+    ...
+/>
+```
+
+在提交按钮上方展示错误：
+
+```rust
+{move || error_msg().map(|msg| view! {
+    <p class="text-sm text-destructive">{msg}</p>
+})}
+<Button
+    class="w-full"
+    attr:disabled=move || login_action.pending().get()
+>
+    {move || if login_action.pending().get() { "Logging in..." } else { "Login" }}
+</Button>
+```

@@ -27,7 +27,9 @@ async fn main() {
 #[cfg(feature = "ssr")]
 fn shell(options: leptos::prelude::LeptosOptions) -> impl leptos::prelude::IntoView {
     use explonz_admin::app::App;
+    use leptos::hydration::{AutoReload, HydrationScripts};
     use leptos::prelude::*;
+    use leptos_meta::*;
 
     view! {
         <!DOCTYPE html>
@@ -37,6 +39,7 @@ fn shell(options: leptos::prelude::LeptosOptions) -> impl leptos::prelude::IntoV
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 <AutoReload options=options.clone()/>
                 <HydrationScripts options/>
+                <MetaTags/>
             </head>
             <body>
                 <App/>

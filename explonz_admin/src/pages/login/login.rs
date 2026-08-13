@@ -1,11 +1,14 @@
 use icons::{Eye, EyeOff};
 use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
+use leptos_router::NavigateOptions;
 
 use crate::components::ui::button::{Button, ButtonVariant};
 use crate::components::ui::input::Input;
 use crate::components::ui::label::Label;
 
 use crate::components::ui::card::{Card, CardContent, CardDescription, CardHeader, CardTitle};
+use crate::server::auth::AdminLogin;
 
 #[component]
 pub fn LoginPage() -> impl IntoView {
@@ -23,6 +26,20 @@ pub fn LoginPage() -> impl IntoView {
         }
     };
 
+    let login_action = ServerAction::<AdminLogin>::new();
+
+    // 监听 action 结果，成功则跳转
+    let navigate = use_navigate();
+    Effect::new(move |_| {
+        let rs_opt = login_action.value().get();
+        if let Some(rs) = rs_opt {
+            match rs {
+                Ok(_) => navigate("/dashboard", NavigateOptions::default()),
+                Err(e) => leptos::logging::log!("服务器返回错误: {}", e),
+            };
+        }   
+    });
+
     view! {
         <div class="flex justify-center items-center p-6 w-full md:p-10 min-h-svh">
             <div class="w-full max-w-sm">
@@ -33,7 +50,7 @@ pub fn LoginPage() -> impl IntoView {
                             <CardDescription>Enter your email below to login to your account</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form>
+                            <ActionForm action=login_action>
                                 <div class="flex flex-col gap-6">
                                     <div class="grid gap-3">
                                         <Label html_for="email">Email</Label>
@@ -43,6 +60,7 @@ pub fn LoginPage() -> impl IntoView {
                                             autocomplete="username"
                                             attr:placeholder="m@example.com"
                                             attr:required=true
+                                            attr:name="email"
                                         />
                                     </div>
                                     <div class="grid gap-3">
@@ -64,6 +82,7 @@ pub fn LoginPage() -> impl IntoView {
                                                 minlength=8
                                                 attr:required=true
                                                 class="pr-10"
+                                                attr:name="password"
                                             />
                                             <button
                                                 type="button"
@@ -103,11 +122,11 @@ pub fn LoginPage() -> impl IntoView {
                                     </div>
                                 </div>
                                 <div class="mt-4 text-sm text-center">
-                                    "Don't have an account?" <a href="#" class="underline underline-offset-4">
+                                    "Don't have an account? " <a href="#" class="underline underline-offset-4">
                                         Sign up
                                     </a>
                                 </div>
-                            </form>
+                            </ActionForm>
                         </CardContent>
                     </Card>
                 </div>

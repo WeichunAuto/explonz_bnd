@@ -18,7 +18,6 @@ use uuid::Uuid;
 use crate::api::auth::dto::{GoogleTokenResponse, OtpTokenResponse, UserForResponse};
 use crate::config::AppConfig;
 use crate::entity::sea_orm_active_enums::AuthProviderType;
-use crate::entity::users::Model;
 use crate::entity::{prelude::*, users};
 use crate::entity::{sign_up_otps, user_auth_providers};
 use crate::error::ApiError;
@@ -34,7 +33,7 @@ use chrono::DateTime;
 use sea_orm::sqlx::types::chrono;
 
 use resend_rs::types::CreateEmailBaseOptions;
-use resend_rs::{Resend, Result};
+use resend_rs::Resend;
 
 // Google OAuth2 的验证请求URL
 const GOOGLE_OAUTH2_URL: &str = "https://oauth2.googleapis.com/tokeninfo";

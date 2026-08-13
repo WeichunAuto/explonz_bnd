@@ -23,10 +23,14 @@ icons.workspace = true
 leptos_ui.workspace = true
 strum.workspace = true
 axum-extra = { workspace = true, features = ["cookie"], optional = true  }
+wasm-bindgen = { version = "0.2.127", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { version = "1", features = ["v4", "serde", "js"] }
+
 
 [features]
 default = []
@@ -41,7 +45,12 @@ ssr = [
     "explonz_shared/ssr",
     "dep:axum-extra",
 ]
-hydrate = ["leptos/hydrate"]
+# hydrate = ["leptos/hydrate"]
+hydrate = [
+    "leptos/hydrate",
+    "dep:wasm-bindgen",
+    "dep:console_error_panic_hook",
+]
 
 [[bin]]
 name = "explonz_admin"

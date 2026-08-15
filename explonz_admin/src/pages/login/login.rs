@@ -4,7 +4,7 @@ use leptos_router::hooks::use_navigate;
 use leptos_router::NavigateOptions;
 
 use crate::components::ui::button::{Button, ButtonVariant};
-use crate::components::ui::input::Input;
+use crate::components::ui::input::{Input, InputType};
 use crate::components::ui::label::Label;
 
 use crate::components::ui::card::{Card, CardContent, CardDescription, CardHeader, CardTitle};
@@ -37,7 +37,7 @@ pub fn LoginPage() -> impl IntoView {
                 Ok(_) => navigate("/dashboard", NavigateOptions::default()),
                 Err(e) => leptos::logging::log!("服务器返回错误: {}", e),
             };
-        }   
+        }
     });
 
     view! {
@@ -76,7 +76,7 @@ pub fn LoginPage() -> impl IntoView {
                                         <div class="relative">
                                             <Input
                                                 node_ref=password_input_ref
-                                                attr:r#type="password"
+                                                r#type=InputType::Password
                                                 attr:id="password"
                                                 autocomplete="current-password"
                                                 minlength=8

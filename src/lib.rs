@@ -7,6 +7,7 @@ pub mod application;
 pub use explonz_shared::common;
 pub mod config;
 pub use explonz_shared::entity;
+pub mod commons;
 pub mod error;
 pub mod infrastructure;
 pub mod middleware;

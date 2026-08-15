@@ -491,3 +491,6 @@ let error_msg = move || {
     {move || if login_action.pending().get() { "Logging in..." } else { "Login" }}
 </Button>
 ```
+
+password = bobbybobby
+password_hash = "$2b$12$sTj.1a7akgwVOGpDikTKsO8raBcG9MJ8t/OCSPlBT.Dg1sl2/Prx6"

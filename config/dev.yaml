@@ -23,6 +23,12 @@ pool:
 email:
   sender: "onboarding@resend.dev"
   password: "WW_33_cc163!"
-  api_key: ""
+  api_key: "" # 待办：存入到 .env 环境变量中
   attempts: "5"  # otp code 最多可以尝试的次数
   otp_code_validity_time: "2"  # otp code 的有效时间（分钟）
+
+# 管理员后台账号
+# admin:
+#   account: ${ADMIN_ACCOUNT}
+#   password: ${ADMIN_PASSWORD_HASH}
+  

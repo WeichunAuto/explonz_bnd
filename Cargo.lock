@@ -1488,6 +1488,8 @@ dependencies = [
 name = "explonz_shared"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bcrypt",
  "chrono",
  "rust_decimal",
  "sea-orm",

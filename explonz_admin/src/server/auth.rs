@@ -4,23 +4,43 @@ use leptos_ui::clx::{use_context, ServerFnError};
 
 #[server]
 pub async fn get_current_user() -> Result<Option<AdminUser>, ServerFnError> {
-    Ok(None)
+    println!("测试输出！");
+
+    use axum_extra::extract::CookieJar;
+    use explonz_shared::common::auth::get_jwt;
+    use leptos_axum::extract;
+
+    // 1. 提取 Cookie Jar
+    let jar: CookieJar = extract()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // 2. 读取 access_token cookie
+    let token = match jar.get("access_token") {
+        Some(c) => c.value().to_string(),
+        None => return Ok(None), // 未登录
+    };
+
+    // 3. 验证并解码 JWT（get_jwt() 内置签名 + 过期校验）
+    match get_jwt().decode(&token) {
+        Ok(principal) => Ok(Some(AdminUser {
+            id: principal.id,
+            name: principal.name,
+            email: principal.email,
+        })),
+        Err(_) => Ok(None), // token 无效或过期
+    }
 }
 
 #[server(AdminLogin, "/api")]
 pub async fn admin_login(email: String, password: String) -> Result<(), ServerFnError> {
     use axum::http::header::{self, HeaderValue};
     use explonz_shared::common::security::{hash_password, verify_password};
-    // use bcrypt::verify;
-    // use jsonwebtoken::{encode, EncodingKey, Header};
-    // use explonz_bnd::config::AppConfig;
     use leptos_axum::ResponseOptions;
     use serde::{Deserialize, Serialize};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    println!("email = {}", email);
-    println!("password = {}", password);
-    println!("password_hash = {:?}", hash_password(&password).unwrap());
+    use explonz_shared::common::auth::{get_jwt, Principal};
 
     // 1. 读取环境变量中的管理员凭据
     let admin_email = std::env::var("ADMIN_ACCOUNT")
@@ -33,14 +53,34 @@ pub async fn admin_login(email: String, password: String) -> Result<(), ServerFn
         return Err(ServerFnError::new("Invalid email or password"));
     }
 
-    println!("admin_hash = {}", admin_hash);
-
     // 3. 验证 bcrypt 密码
     let valid = verify_password(&password, &admin_hash)
         .map_err(|_| ServerFnError::new("Invalid email or password"))?;
     if !valid {
         return Err(ServerFnError::new("Invalid email or password"));
     }
+
+    // 4. 生成 JWT（1 小时有效期，由 get_jwt() 默认配置控制）
+    let principal = Principal {
+        id: format!("admin_{}", email),
+        name: email.clone(),
+        email: email.clone(),
+    };
+
+    let (access_token, _expires_at) = get_jwt()
+        .encode(principal, true)
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // 5. 写入 HttpOnly Cookie
+    let response_opts = use_context::<ResponseOptions>()
+        .ok_or_else(|| ServerFnError::new("No ResponseOptions in context"))?;
+    let cookie = format!(
+        "access_token={access_token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600" // 生产环境在 Max-Age 后追加 "; Secure"
+    );
+    response_opts.insert_header(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&cookie).map_err(|e| ServerFnError::new(e.to_string()))?,
+    );
 
     Ok(())
 }

@@ -313,64 +313,85 @@ ssr = [
 
 ### 14.2 `server/auth.rs` — 完整实现
 
+> **采用方案**：使用 `explonz_shared::common::auth::get_jwt()` 统一 JWT 编解码，`explonz_shared::common::security::verify_password` 验证 bcrypt 密码。
+> 无需在 `explonz_admin` 内额外依赖 `jsonwebtoken` / `bcrypt`，由 `explonz_shared/ssr` feature 提供。
+
 ```rust
 use explonz_shared::common::dto::AdminUser;
 use leptos::prelude::*;
+
+// ── get_current_user ─────────────────────────────────────────────────────────
+
+#[server(GetCurrentUser, "/api")]
+pub async fn get_current_user() -> Result<Option<AdminUser>, ServerFnError> {
+    use axum_extra::extract::CookieJar;
+    use explonz_shared::common::auth::get_jwt;
+    use leptos_axum::extract;
+
+    // 1. 提取 Cookie Jar
+    let jar: CookieJar = extract()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // 2. 读取 access_token cookie
+    let token = match jar.get("access_token") {
+        Some(c) => c.value().to_string(),
+        None => return Ok(None), // 未登录
+    };
+
+    // 3. 验证并解码 JWT（get_jwt() 内置签名 + 过期校验）
+    match get_jwt().decode(&token) {
+        Ok(principal) => Ok(Some(AdminUser {
+            id: principal.id,
+            name: principal.name,
+            email: principal.email,
+        })),
+        Err(_) => Ok(None), // token 无效或过期
+    }
+}
 
 // ── admin_login ──────────────────────────────────────────────────────────────
 
 #[server(AdminLogin, "/api")]
 pub async fn admin_login(email: String, password: String) -> Result<(), ServerFnError> {
     use axum::http::header::{self, HeaderValue};
-    use bcrypt::verify;
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use explonz_shared::common::auth::{get_jwt, Principal};
+    use explonz_shared::common::security::verify_password;
     use leptos_axum::ResponseOptions;
-    use serde::{Deserialize, Serialize};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     // 1. 读取环境变量中的管理员凭据
-    let admin_email = std::env::var("ADMIN_EMAIL")
-        .map_err(|_| ServerFnError::new("Server misconfigured: ADMIN_EMAIL missing"))?;
+    let admin_email = std::env::var("ADMIN_ACCOUNT")
+        .map_err(|_| ServerFnError::new("Server misconfigured: ADMIN_ACCOUNT missing"))?;
     let admin_hash = std::env::var("ADMIN_PASSWORD_HASH")
         .map_err(|_| ServerFnError::new("Server misconfigured: ADMIN_PASSWORD_HASH missing"))?;
 
-    // 2. 验证 email（constant-time 比较防时序攻击）
+    // 2. 验证 email
     if email != admin_email {
         return Err(ServerFnError::new("Invalid email or password"));
     }
 
     // 3. 验证 bcrypt 密码
-    let valid = verify(&password, &admin_hash)
+    let valid = verify_password(&password, &admin_hash)
         .map_err(|_| ServerFnError::new("Invalid email or password"))?;
     if !valid {
         return Err(ServerFnError::new("Invalid email or password"));
     }
 
-    // 4. 生成 JWT（1 小时有效期）
-    #[derive(Serialize, Deserialize)]
-    struct Claims {
-        sub: String, // admin email
-        exp: u64,
-    }
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "dev_secret_change_in_production".to_string());
-    let exp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 3600;
-    let token = encode(
-        &Header::default(),
-        &Claims { sub: email, exp },
-        &EncodingKey::from_secret(jwt_secret.as_bytes()),
-    )
-    .map_err(|e| ServerFnError::new(e.to_string()))?;
+    // 4. 生成 JWT（1 小时有效期，由 get_jwt() 默认配置控制）
+    let principal = Principal {
+        id: format!("admin_{}", email),
+        name: email.clone(),
+        email: email.clone(),
+    };
+    let (access_token, _) = get_jwt()
+        .encode(principal, true)
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
 
     // 5. 写入 HttpOnly Cookie
     let response_opts = use_context::<ResponseOptions>()
         .ok_or_else(|| ServerFnError::new("No ResponseOptions in context"))?;
     let cookie = format!(
-        "access_token={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600"
+        "access_token={access_token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600"
         // 生产环境在 Max-Age 后追加 "; Secure"
     );
     response_opts.insert_header(
@@ -380,51 +401,17 @@ pub async fn admin_login(email: String, password: String) -> Result<(), ServerFn
 
     Ok(())
 }
-
-// ── get_current_user ─────────────────────────────────────────────────────────
-
-#[server(GetCurrentUser, "/api")]
-pub async fn get_current_user() -> Result<Option<AdminUser>, ServerFnError> {
-    use axum_extra::extract::CookieJar;
-    use jsonwebtoken::{decode, DecodingKey, Validation};
-    use leptos_axum::extract;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct Claims {
-        sub: String,
-        exp: u64,
-    }
-
-    // 1. 提取 Cookie Jar
-    let jar: CookieJar = extract().await
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
-
-    let token = match jar.get("access_token") {
-        Some(c) => c.value().to_string(),
-        None => return Ok(None), // 未登录
-    };
-
-    // 2. 验证并解码 JWT
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "dev_secret_change_in_production".to_string());
-    let mut validation = Validation::default();
-    validation.validate_aud = false;
-
-    match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(jwt_secret.as_bytes()),
-        &validation,
-    ) {
-        Ok(data) => Ok(Some(AdminUser {
-            id: "admin".to_string(),
-            name: "Admin".to_string(),
-            email: data.claims.sub,
-        })),
-        Err(_) => Ok(None), // token 无效或过期
-    }
-}
 ```
+
+**关键依赖**（已在 `explonz_admin/Cargo.toml` ssr feature 中配置）：
+
+| 符号 | 来源 |
+|------|------|
+| `get_jwt()`, `Principal` | `explonz_shared::common::auth`（ssr feature） |
+| `verify_password` | `explonz_shared::common::security`（ssr feature） |
+| `AdminUser` | `explonz_shared::common::dto`（无 feature gate） |
+| `CookieJar` | `axum_extra::extract`（`axum-extra` optional dep） |
+| `ResponseOptions` | `leptos_axum` |
 
 ---
 
@@ -494,3 +481,132 @@ let error_msg = move || {
 
 password = bobbybobby
 password_hash = "$2b$12$sTj.1a7akgwVOGpDikTKsO8raBcG9MJ8t/OCSPlBT.Dg1sl2/Prx6"
+
+---
+
+## 15. 关于调用 workspace 中 `get_jwt().encode(principal, true)` 的分析
+
+### 15.1 `get_jwt()` 在哪里
+
+`get_jwt()` 定义在 `explonz_bnd`（根 package）的 `src/infrastructure/auth.rs:159`：
+
+```rust
+pub fn get_jwt() -> &'static Jwt {
+    &JWT_INSTANCE
+}
+```
+
+返回全局单例 `&'static Jwt`。`encode` 签名为：
+
+```rust
+pub fn encode(&self, principal: Principal, is_with_exp: bool) -> anyhow::Result<(String, Option<u64>)>
+```
+
+- 返回 `(access_token: String, expires_at: Option<u64>)`
+- `is_with_exp = true` 时同时返回过期时间戳
+
+`explonz_bnd/src/service/auth.rs:555` 已有完整使用范例：
+
+```rust
+use crate::infrastructure::auth::{get_jwt, Principal};
+
+let principal = Principal {
+    id: login_user.id.to_string(),
+    name: login_user.nickname.clone(),
+    email: login_user.email.clone().unwrap_or_default(),
+};
+
+let (access_token, access_token_expires_at) = get_jwt().encode(principal, true)?;
+```
+
+### 15.2 为什么 `explonz_admin` 不能直接 `use explonz_bnd::...`
+
+`explonz_admin/Cargo.toml` 中有一行被注释掉的依赖：
+
+```toml
+# explonz_bnd = { path = "../../explonz_bnd" }
+```
+
+原因有两点：
+
+1. **编译目标冲突**：`explonz_admin` 同时编译为 `wasm32`（hydrate feature）和 `x86_64`（ssr feature）。`explonz_bnd` 的众多依赖（`sea-orm`、`reqwest`、`resend-rs` 等）不支持 wasm32，会导致 hydrate 编译失败。
+2. **架构耦合**：`explonz_admin` 是独立的 Admin 前端服务，`explonz_bnd` 是 REST API 后端服务，两者应保持解耦。
+
+### 15.3 根本原因
+
+JWT 工具代码（`Jwt`、`Principal`、`get_jwt()`）目前只存在于 `explonz_bnd/src/infrastructure/auth.rs`，没有放入可跨 crate 共享的 `explonz_shared`，导致 `explonz_admin` 无法访问。
+
+### 15.4 推荐方案：将 JWT 代码迁移至 `explonz_shared`
+
+`explonz_shared` 已被两个 crate 共同依赖，且已有 `ssr` feature gate 机制，是放置 JWT 工具的最合适位置。
+
+**步骤一**：为 `explonz_shared` 添加所需依赖（`explonz_shared/Cargo.toml`）
+
+```toml
+[dependencies]
+jsonwebtoken = { workspace = true, optional = true }
+sha2         = { workspace = true, optional = true }
+hex          = { workspace = true, optional = true }
+xid          = { workspace = true, optional = true }
+
+[features]
+ssr = [
+    "dep:sea-orm",
+    "dep:bcrypt",
+    "dep:anyhow",
+    "dep:jsonwebtoken",  # 新增
+    "dep:sha2",          # 新增
+    "dep:hex",           # 新增
+    "dep:xid",           # 新增
+]
+```
+
+**步骤二**：新建 `explonz_shared/src/common/auth.rs`，将 `explonz_bnd/src/infrastructure/auth.rs` 的全部内容复制过来，并在 `explonz_shared/src/common/mod.rs` 中导出：
+
+```rust
+#[cfg(feature = "ssr")]
+pub mod auth;
+```
+
+**步骤三**：更新 `explonz_bnd` 的导入（`src/service/auth.rs`、`src/middleware.rs`）：
+
+```rust
+// 修改前
+use crate::infrastructure::auth::{get_jwt, Principal};
+
+// 修改后
+use explonz_shared::common::auth::{get_jwt, Principal};
+```
+
+`src/infrastructure/auth.rs` 可改为 re-export：
+
+```rust
+pub use explonz_shared::common::auth::*;
+```
+
+**步骤四**：在 `admin_login` 中调用（`explonz_admin/Cargo.toml` 的 `ssr` feature 已包含 `"explonz_shared/ssr"`，无需额外配置）：
+
+```rust
+use explonz_shared::common::auth::{get_jwt, Principal};
+
+let principal = Principal {
+    id: "admin".to_string(),
+    name: "Admin".to_string(),
+    email: email.clone(),
+};
+
+let (access_token, _expires_at) = get_jwt()
+    .encode(principal, true)
+    .map_err(|e| ServerFnError::new(e.to_string()))?;
+```
+
+### 15.5 方案对比
+
+| 方案 | 可行性 | 优点 | 缺点 |
+|------|--------|------|------|
+| **迁移 JWT 至 `explonz_shared`（推荐）** | 高 | 架构清晰，符合现有模式 | 需要少量重构 |
+| 添加 `explonz_bnd` 为 `explonz_admin` 依赖 | 低 | 改动小 | wasm32 编译失败，架构耦合 |
+| 在 `explonz_admin` 内自行实现 JWT（第 14.2 节方案） | 高 | 无需重构，立即可用 | JWT 逻辑与主服务不共享，密钥管理需单独配置 |
+
+> 第 14.2 节的实现采用了"在 admin 内独立实现 JWT"的方式，短期可用。
+> 长期建议按本节推荐方案将 JWT 迁移到 `explonz_shared`，统一密钥和算法配置。

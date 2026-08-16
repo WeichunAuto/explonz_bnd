@@ -34,7 +34,7 @@ pub fn LoginPage() -> impl IntoView {
         let rs_opt = login_action.value().get();
         if let Some(rs) = rs_opt {
             match rs {
-                Ok(_) => navigate("/dashboard", NavigateOptions::default()),
+                Ok(_) => navigate("/view/sidenav02/docs", NavigateOptions::default()),
                 Err(e) => leptos::logging::log!("服务器返回错误: {}", e),
             };
         }

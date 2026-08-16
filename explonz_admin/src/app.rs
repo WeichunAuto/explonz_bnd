@@ -6,7 +6,11 @@ use leptos_router::{
 };
 
 use crate::pages::{
-    auth_guard::AuthGuard, dashboard::Dashboard, login::login::LoginPage, posts::list::PostList,
+    auth_guard::AuthGuard,
+    dashboard::Dashboard,
+    home::index::{Sidenav02Routes, SidenavLayout},
+    login::login::LoginPage,
+    posts::list::PostList,
     spots::list::SpotList,
 };
 
@@ -19,11 +23,10 @@ pub fn App() -> impl IntoView {
         <Title text="Explonz Admin"/>
         <Router>
             <Routes fallback=|| "404 Not Found">
-                // <Route path=path!("/")       view=|| view! { <Redirect path="/dashboard"/> }/>
-                // <Route path=path!("/")  view=LoginPage/>
-
                 <Route path=path!("/login")  view=LoginPage/>
+
                 <ParentRoute path=path!("/") view=AuthGuard>
+                    <Sidenav02Routes />
                     <Route path=path!("/dashboard") view=Dashboard/>
                     <Route path=path!("/posts")     view=PostList/>
                     <Route path=path!("/spots")     view=SpotList/>

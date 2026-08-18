@@ -610,3 +610,505 @@ let (access_token, _expires_at) = get_jwt()
 
 > 第 14.2 节的实现采用了"在 admin 内独立实现 JWT"的方式，短期可用。
 > 长期建议按本节推荐方案将 JWT 迁移到 `explonz_shared`，统一密钥和算法配置。
+
+---
+
+## 16. 保存原 URL + 登录后回跳方案
+
+### 16.1 总体流程
+
+```
+用户访问 /dashboard（未登录）
+    ↓
+AuthGuard 判断未登录
+    ↓
+重定向到 /login?redirect=%2Fdashboard&reason=login_required
+    ↓
+LoginPage 读取 reason 参数 → 展示对应提示语
+LoginPage 读取 redirect 参数 → 登录成功后跳回
+    ↓
+用户提交表单，登录成功
+    ↓
+navigate("/dashboard")  ← 从 redirect 参数读取
+```
+
+---
+
+### 16.2 `reason` 参数值约定
+
+| reason 值 | 触发场景 | LoginPage 展示文案 |
+|-----------|----------|-------------------|
+| `login_required` | 无 Cookie，从未登录 | "请先登录以继续" |
+| `session_expired` | Cookie 存在但 JWT 已过期/无效 | "登录已过期，请重新登录" |
+
+---
+
+### 16.3 （可选）改动 `get_current_user` 以区分 reason
+
+当前 `get_current_user` 将"无 Cookie"和"JWT 过期"都归并为 `Ok(None)`，无法区分。若需展示不同文案，需调整返回类型。
+
+**方案 A：新增 `AuthStatus` 枚举（推荐）**
+
+在 `explonz_shared/src/common/dto.rs` 新增：
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AuthStatus {
+    Authenticated(AdminUser),
+    NotLoggedIn,    // 无 access_token Cookie
+    TokenExpired,   // Cookie 存在但 JWT 校验失败
+}
+```
+
+`get_current_user` 返回类型改为 `Result<AuthStatus, ServerFnError>`，`AuthGuard` 据此选择 reason 值。
+
+**方案 B：统一使用 `login_required`（更简单）**
+
+若不需要区分，跳过此步骤，始终传 `reason=login_required`。
+
+---
+
+### 16.4 改动一：`pages/auth_guard.rs` — 构建带参数的跳转 URL
+
+在 `AuthGuard` 组件中：
+
+1. 引入 `use_location` 读取当前路径（SSR 和 Client 均可用）
+2. 拼接 `/login?redirect={pathname}&reason={reason}` 字符串
+3. SSR 分支传给 `leptos_axum::redirect`，Client 分支传给 `navigate`
+
+**关键改动思路（伪代码）：**
+
+```rust
+// 1. 引入
+use leptos_router::hooks::use_location;
+
+// 2. 在组件内获取当前路径
+let location = use_location();
+
+// 3. 在未登录分支构建 URL
+let pathname = location.pathname.get_untracked();
+// 简单路径无需 percent-encode（admin 路由仅含字母/数字/连字符）
+let login_url = format!("/login?redirect={}&reason=login_required", pathname);
+
+// SSR 分支
+#[cfg(feature = "ssr")]
+leptos_axum::redirect(&login_url);
+
+// Client 分支
+#[cfg(not(feature = "ssr"))]
+navigate(&login_url, NavigateOptions::default());
+```
+
+若已按 16.3 区分了 `AuthStatus`，则根据状态选择 reason：
+
+```rust
+let reason = match result {
+    AuthStatus::NotLoggedIn  => "login_required",
+    AuthStatus::TokenExpired => "session_expired",
+    _                        => "login_required",
+};
+let login_url = format!("/login?redirect={}&reason={}", pathname, reason);
+```
+
+---
+
+### 16.5 改动二：`pages/login/login.rs` — 读取参数、展示提示、登录后回跳
+
+#### 读取 query params
+
+```rust
+use leptos_router::hooks::use_query_map;
+
+let query         = use_query_map();
+let redirect_path = move || query.read().get("redirect").cloned().unwrap_or_default();
+let reason        = move || query.read().get("reason").cloned().unwrap_or_default();
+```
+
+#### 展示 reason 提示语（放在表单最上方）
+
+```rust
+{move || {
+    let msg = match reason().as_str() {
+        "session_expired" => Some("登录已过期，请重新登录"),
+        "login_required"  => Some("请先登录以继续"),
+        _                 => None,
+    };
+    msg.map(|text| view! {
+        <p class="text-sm text-amber-600 text-center">{text}</p>
+    })
+}}
+```
+
+#### 登录成功后回跳（替换当前写死的目标路径）
+
+将现有的：
+
+```rust
+Ok(_) => navigate("/view/sidenav02/docs", NavigateOptions::default()),
+```
+
+改为：
+
+```rust
+Ok(_) => {
+    let dest = safe_redirect_dest(redirect_path());
+    navigate(&dest, NavigateOptions::default());
+}
+```
+
+其中 `safe_redirect_dest` 是一个校验函数（见 16.6）。
+
+---
+
+### 16.6 安全校验：防止开放重定向（Open Redirect）
+
+`redirect` 参数是用户可控的 URL 参数，必须校验，否则攻击者可构造：
+```
+/login?redirect=//evil.com
+```
+让登录成功后跳转到外部恶意站点。
+
+**校验函数：**
+
+```rust
+fn safe_redirect_dest(raw: String) -> String {
+    // 规则：
+    // 1. 必须以 / 开头（站内路径）
+    // 2. 不能以 // 开头（协议相对 URL，会跳出站外）
+    // 3. 不能跳回 /login 自身（防止循环）
+    let valid = raw.starts_with('/')
+        && !raw.starts_with("//")
+        && !raw.starts_with("/login");
+
+    if valid { raw } else { "/dashboard".to_string() }
+}
+```
+
+---
+
+### 16.7 改动文件清单
+
+| 文件 | 改动内容 | 是否必须 |
+|------|----------|----------|
+| `pages/auth_guard.rs` | 引入 `use_location`，拼接带 `redirect` 和 `reason` 的 login URL | 必须 |
+| `pages/login/login.rs` | 引入 `use_query_map`，读取 reason 展示提示，登录后 navigate 到 redirect 参数 | 必须 |
+| `explonz_shared/src/common/dto.rs` | 新增 `AuthStatus` 枚举 | 可选（区分 reason 时需要） |
+| `server/auth.rs` | `get_current_user` 返回 `AuthStatus` | 可选（区分 reason 时需要） |
+
+---
+
+## 17. `get_current_user` 返回 `AuthStatus` 详细改造
+
+### 17.1 前置状态确认
+
+`AuthStatus` **已存在**于 `explonz_shared/src/common/dto.rs`（99–104 行），无需新增：
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AuthStatus {
+    Authenticated(AdminUser),
+    NotLoggedIn,    // 无 access_token Cookie
+    TokenExpired,   // Cookie 存在但 JWT 校验失败
+}
+```
+
+---
+
+### 17.2 改动一：`explonz_admin/src/server/auth.rs`
+
+#### 17.2.1 改动点一览
+
+| 行 | 改动前 | 改动后 |
+|----|--------|--------|
+| 第 1 行 import | `use explonz_shared::common::dto::AdminUser;` | `use explonz_shared::common::dto::{AdminUser, AuthStatus};` |
+| 第 6 行 返回类型 | `Result<Option<AdminUser>, ServerFnError>` | `Result<AuthStatus, ServerFnError>` |
+| 第 21 行（无 Cookie） | `return Ok(None);` | `return Ok(AuthStatus::NotLoggedIn);` |
+| 第 26–30 行（解码成功） | `Ok(principal) => Ok(Some(AdminUser { ... }))` | `Ok(principal) => Ok(AuthStatus::Authenticated(AdminUser { ... }))` |
+| 第 31 行（解码失败） | `Err(_) => Ok(None),` | `Err(_) => Ok(AuthStatus::TokenExpired),` |
+
+#### 17.2.2 改动后完整函数
+
+```rust
+use explonz_shared::common::dto::{AdminUser, AuthStatus};  // ← AuthStatus 补入
+use leptos::server;
+use leptos_ui::clx::{use_context, ServerFnError};
+
+#[server]
+pub async fn get_current_user() -> Result<AuthStatus, ServerFnError> {  // ← 返回类型
+    use axum_extra::extract::CookieJar;
+    use explonz_shared::common::auth::get_jwt;
+    use leptos_axum::extract;
+
+    // 1. 提取 Cookie Jar
+    let jar: CookieJar = extract()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // 2. 读取 access_token cookie
+    //    无 Cookie → 从未登录
+    let token = match jar.get("access_token") {
+        Some(c) => c.value().to_string(),
+        None => return Ok(AuthStatus::NotLoggedIn),  // ← 原 Ok(None)
+    };
+
+    // 3. 验证并解码 JWT
+    match get_jwt().decode(&token) {
+        Ok(principal) => Ok(AuthStatus::Authenticated(AdminUser {  // ← 原 Ok(Some(...))
+            id: principal.id,
+            name: principal.name,
+            email: principal.email,
+        })),
+        Err(_) => Ok(AuthStatus::TokenExpired),  // ← 原 Ok(None)
+    }
+}
+```
+
+> **为什么解码错误统一归为 `TokenExpired`？**
+> `get_jwt().decode()` 内部使用 `anyhow::Result`，错误经过包装后无法用 `downcast`
+> 区分 `ExpiredSignature` 与 `InvalidSignature`。实践上当 Cookie 存在时解码失败的
+> 最常见原因是过期，统一显示"登录已过期"对用户最友好，且不泄露签名细节。
+> 如后续需要精细区分，可让 `Jwt::decode` 直接返回 `jsonwebtoken::errors::Error`。
+
+---
+
+### 17.3 改动二：`explonz_admin/src/pages/auth_guard.rs`
+
+#### 17.3.1 import 变化
+
+```rust
+// 新增
+use explonz_shared::common::dto::AuthStatus;
+use leptos_router::hooks::use_location;
+
+// 保持（仅 hydrate 编译）
+#[cfg(not(feature = "ssr"))]
+use leptos_router::{hooks::use_navigate, NavigateOptions};
+
+// 移除（不再需要单独引入 get_current_user 的旧返回类型相关 import）
+```
+
+#### 17.3.2 组件函数体变化
+
+在 `Resource::new` 之后，`view!` 之前，新增一行：
+
+```rust
+let location = use_location();
+```
+
+#### 17.3.3 match 结构变化
+
+**改动前（3 个分支）：**
+```rust
+match user.get() {
+    None                           => view! { <Outlet/> }.into_any(),
+    Some(Ok(None)) | Some(Err(_)) => { navigate("/login", ...); view! {}.into_any() }
+    Some(Ok(Some(_user)))          => view! { <Outlet/> }.into_any(),
+}
+```
+
+**改动后（4 个分支）：**
+```rust
+match user.get() {
+    // 资源未就绪，由 Suspense fallback 处理
+    None => view! { <Outlet/> }.into_any(),
+
+    // 已登录 → 正常渲染子路由
+    Some(Ok(AuthStatus::Authenticated(_))) => view! { <Outlet/> }.into_any(),
+
+    // 无 Cookie（从未登录）→ reason=login_required
+    Some(Ok(AuthStatus::NotLoggedIn)) => {
+        let pathname = location.pathname.get_untracked();
+        let url = format!("/login?redirect={}&reason=login_required", pathname);
+
+        #[cfg(feature = "ssr")]
+        leptos_axum::redirect(&url);
+
+        #[cfg(not(feature = "ssr"))]
+        navigate(&url, NavigateOptions::default());
+
+        view! {}.into_any()
+    }
+
+    // Cookie 存在但 JWT 无效/过期 → reason=session_expired
+    Some(Ok(AuthStatus::TokenExpired)) => {
+        let pathname = location.pathname.get_untracked();
+        let url = format!("/login?redirect={}&reason=session_expired", pathname);
+
+        #[cfg(feature = "ssr")]
+        leptos_axum::redirect(&url);
+
+        #[cfg(not(feature = "ssr"))]
+        navigate(&url, NavigateOptions::default());
+
+        view! {}.into_any()
+    }
+
+    // Server Function 本身调用出错 → 安全起见按未登录处理
+    Some(Err(_)) => {
+        #[cfg(feature = "ssr")]
+        leptos_axum::redirect("/login?reason=login_required");
+
+        #[cfg(not(feature = "ssr"))]
+        navigate("/login?reason=login_required", NavigateOptions::default());
+
+        view! {}.into_any()
+    }
+}
+```
+
+#### 17.3.4 完整改动后文件预览
+
+```rust
+use leptos::prelude::*;
+use leptos::{component, server::Resource, view, IntoView};
+use leptos_router::components::Outlet;
+use leptos_router::hooks::use_location;
+use leptos_ui::clx::{IntoAny, Suspense};
+
+#[cfg(not(feature = "ssr"))]
+use leptos_router::{hooks::use_navigate, NavigateOptions};
+
+use explonz_shared::common::dto::AuthStatus;
+use crate::server::auth::get_current_user;
+
+#[component]
+pub fn AuthGuard() -> impl IntoView {
+    let user     = Resource::new(|| (), |_| get_current_user());
+    let location = use_location();
+
+    #[cfg(not(feature = "ssr"))]
+    let navigate = use_navigate();
+
+    view! {
+        <Suspense fallback=move || view! {
+            <div class="flex h-screen items-center justify-center">"load..."</div>
+        }>
+            {move || {
+                match user.get() {
+                    None =>
+                        view! { <Outlet/> }.into_any(),
+
+                    Some(Ok(AuthStatus::Authenticated(_))) =>
+                        view! { <Outlet/> }.into_any(),
+
+                    Some(Ok(AuthStatus::NotLoggedIn)) => {
+                        let url = format!(
+                            "/login?redirect={}&reason=login_required",
+                            location.pathname.get_untracked()
+                        );
+                        #[cfg(feature = "ssr")]
+                        leptos_axum::redirect(&url);
+                        #[cfg(not(feature = "ssr"))]
+                        navigate(&url, NavigateOptions::default());
+                        view! {}.into_any()
+                    }
+
+                    Some(Ok(AuthStatus::TokenExpired)) => {
+                        let url = format!(
+                            "/login?redirect={}&reason=session_expired",
+                            location.pathname.get_untracked()
+                        );
+                        #[cfg(feature = "ssr")]
+                        leptos_axum::redirect(&url);
+                        #[cfg(not(feature = "ssr"))]
+                        navigate(&url, NavigateOptions::default());
+                        view! {}.into_any()
+                    }
+
+                    Some(Err(_)) => {
+                        #[cfg(feature = "ssr")]
+                        leptos_axum::redirect("/login?reason=login_required");
+                        #[cfg(not(feature = "ssr"))]
+                        navigate("/login?reason=login_required", NavigateOptions::default());
+                        view! {}.into_any()
+                    }
+                }
+            }}
+        </Suspense>
+    }
+}
+```
+
+---
+
+### 17.4 改动三：`explonz_admin/src/pages/login/login.rs`
+
+#### 17.4.1 新增 import
+
+```rust
+use leptos_router::hooks::use_query_map;
+```
+
+#### 17.4.2 组件函数体：新增 query 读取（放在 `let show_password` 之后）
+
+```rust
+// 读取 URL 查询参数
+let query         = use_query_map();
+let redirect_path = move || query.read().get("redirect").cloned().unwrap_or_default();
+let reason        = move || query.read().get("reason").cloned().unwrap_or_default();
+```
+
+#### 17.4.3 修改 Effect：登录成功后跳转到 redirect 参数
+
+```rust
+// 改动前
+Effect::new(move |_| {
+    let rs_opt = login_action.value().get();
+    if let Some(rs) = rs_opt {
+        match rs {
+            Ok(_) => navigate("/view/sidenav02/docs", NavigateOptions::default()),
+            Err(e) => leptos::logging::log!("服务器返回错误: {}", e),
+        };
+    }
+});
+
+// 改动后
+Effect::new(move |_| {
+    if let Some(rs) = login_action.value().get() {
+        match rs {
+            Ok(_) => {
+                let raw = redirect_path();
+                // 安全校验：站内路径 + 不回到 /login（防循环）
+                let dest = if raw.starts_with('/')
+                    && !raw.starts_with("//")
+                    && !raw.starts_with("/login")
+                {
+                    raw
+                } else {
+                    "/dashboard".to_string()
+                };
+                navigate(&dest, NavigateOptions::default());
+            }
+            Err(e) => leptos::logging::log!("登录失败: {}", e),
+        }
+    }
+});
+```
+
+#### 17.4.4 视图：在 `CardHeader` 下方插入 reason 提示语
+
+在 `<CardHeader>...</CardHeader>` 关闭标签之后、`<CardContent>` 之前插入：
+
+```rust
+{move || {
+    let msg = match reason().as_str() {
+        "session_expired" => Some("登录已过期，请重新登录"),
+        "login_required"  => Some("请先登录以继续"),
+        _                 => None,
+    };
+    msg.map(|text| view! {
+        <p class="px-6 pb-2 text-sm text-amber-600 text-center">{text}</p>
+    })
+}}
+```
+
+---
+
+### 17.5 完整改动文件清单
+
+| 文件 | 改动内容 | 改动量 |
+|------|----------|--------|
+| `explonz_shared/src/common/dto.rs` | 无需改动（`AuthStatus` 已存在） | 0 行 |
+| `explonz_admin/src/server/auth.rs` | import + 返回类型 + 3 处返回值 | ~5 行 |
+| `explonz_admin/src/pages/auth_guard.rs` | import + `use_location` + match 由 3 臂改为 4 臂 | ~25 行 |
+| `explonz_admin/src/pages/login/login.rs` | import + query 读取 + Effect + reason 提示语 | ~15 行 |

@@ -1,10 +1,10 @@
-use explonz_shared::common::dto::AdminUser;
+use explonz_shared::common::dto::{AdminUser, AuthStatus};
 use leptos::server;
 use leptos_ui::clx::{use_context, ServerFnError};
 
 #[server]
-pub async fn get_current_user() -> Result<Option<AdminUser>, ServerFnError> {
-    println!("测试输出！");
+pub async fn get_current_user() -> Result<AuthStatus, ServerFnError> {
+    // println!("测试输出！");
 
     use axum_extra::extract::CookieJar;
     use explonz_shared::common::auth::get_jwt;
@@ -18,17 +18,25 @@ pub async fn get_current_user() -> Result<Option<AdminUser>, ServerFnError> {
     // 2. 读取 access_token cookie
     let token = match jar.get("access_token") {
         Some(c) => c.value().to_string(),
-        None => return Ok(None), // 未登录
+        None => return Ok(AuthStatus::NotLoggedIn), // 未登录
     };
 
     // 3. 验证并解码 JWT（get_jwt() 内置签名 + 过期校验）
+    // match get_jwt().decode(&token) {
+    //     Ok(principal) => Ok(Some(AdminUser {
+    //         id: principal.id,
+    //         name: principal.name,
+    //         email: principal.email,
+    //     })),
+    //     Err(_) => Ok(None), // token 无效或过期
+    // }
     match get_jwt().decode(&token) {
-        Ok(principal) => Ok(Some(AdminUser {
+        Ok(principal) => Ok(AuthStatus::Authenticated(AdminUser {
             id: principal.id,
             name: principal.name,
             email: principal.email,
         })),
-        Err(_) => Ok(None), // token 无效或过期
+        Err(_) => Ok(AuthStatus::TokenExpired),
     }
 }
 
@@ -75,7 +83,7 @@ pub async fn admin_login(email: String, password: String) -> Result<(), ServerFn
     let response_opts = use_context::<ResponseOptions>()
         .ok_or_else(|| ServerFnError::new("No ResponseOptions in context"))?;
     let cookie = format!(
-        "access_token={access_token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600" // 生产环境在 Max-Age 后追加 "; Secure"
+        "access_token={access_token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=36000" // 10小时有效，生产环境在 Max-Age 后追加 "; Secure"
     );
     response_opts.insert_header(
         header::SET_COOKIE,

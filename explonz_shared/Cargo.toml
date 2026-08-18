@@ -12,9 +12,21 @@ uuid         = { workspace = true }
 chrono       = { workspace = true }
 rust_decimal = { workspace = true }
 bcrypt = { workspace = true, optional = true }
-anyhow = { workspace = true, optional = true }  
+anyhow = { workspace = true, optional = true }
+jsonwebtoken = { workspace = true, optional = true }
+sha2         = { workspace = true, optional = true }
+hex          = { workspace = true, optional = true }
+xid          = { workspace = true, optional = true }  
 
 
 
 [features]
-  ssr = ["dep:sea-orm", "dep:bcrypt", "dep:anyhow"]
+ssr = [
+    "dep:sea-orm",
+    "dep:bcrypt",
+    "dep:anyhow",
+    "dep:jsonwebtoken",  # 新增
+    "dep:sha2",          # 新增
+    "dep:hex",           # 新增
+    "dep:xid",           # 新增
+]

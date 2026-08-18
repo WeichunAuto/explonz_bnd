@@ -1,8 +1,6 @@
-use crate::{
-    error::ApiError,
-    infrastructure::auth::{get_jwt, Jwt},
-};
+use crate::error::ApiError;
 use axum::body::Body;
+use explonz_shared::common::auth::{get_jwt, Jwt};
 use http::{header, Request, Response};
 use std::future::Future;
 use std::pin::Pin;

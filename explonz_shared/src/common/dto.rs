@@ -1,3 +1,5 @@
+use std::{fmt::Display, str::FromStr};
+
 use chrono::{DateTime, FixedOffset};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -94,4 +96,39 @@ pub struct AdminUser {
     pub id: String,
     pub name: String,
     pub email: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AuthStatus {
+    Authenticated(AdminUser),
+    NotLoggedIn,  // 无 access_token Cookie
+    TokenExpired, // Cookie 存在但 JWT 校验失败
+}
+
+impl Display for AuthStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AuthStatus::Authenticated(_) => {
+                write!(f, "Authenticated")
+            }
+            AuthStatus::NotLoggedIn => {
+                write!(f, "NotLoggedIn")
+            }
+            AuthStatus::TokenExpired => {
+                write!(f, "TokenExpired")
+            }
+        }
+    }
+}
+
+impl FromStr for AuthStatus {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NotLoggedIn" => Ok(Self::NotLoggedIn),
+            "TokenExpired" => Ok(Self::TokenExpired),
+            _ => Err(()),
+        }
+    }
 }

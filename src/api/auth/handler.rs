@@ -2,7 +2,6 @@ use crate::api::auth::dto::{
     GoogleLoginParams, OtpTokenResponse, SetupPasswordParmas, SignUpParams, SignUpWithCodeParams,
 };
 use crate::error::ApiError;
-use crate::infrastructure::auth::Principal;
 use crate::response::ApiResponse;
 use crate::service::auth::{
     check_email_not_exists_service, generate_otp_code_service, login_with_email_service,
@@ -15,6 +14,7 @@ use crate::{
     request::BValidJson,
     response::ApiResult,
 };
+use explonz_shared::common::auth::Principal;
 
 use axum::Json;
 

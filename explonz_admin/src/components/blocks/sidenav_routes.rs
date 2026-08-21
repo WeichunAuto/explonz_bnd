@@ -9,7 +9,7 @@ use strum::{AsRefStr, Display, EnumIter, EnumString, IntoStaticStr};
 #[strum(serialize_all = "kebab-case")]
 pub enum SidenavRoutes {
     Sidenav01,
-    Sidenav02,
+    Home,
     Sidenav03,
     Sidenav04,
     Sidenav05,
@@ -24,7 +24,7 @@ pub enum SidenavRoutes {
 impl SidenavRoutes {
     pub fn view_segment() -> &'static str {
         // * 💁‍♂️ "view" for the moment, I will switch back to "view" when all good.
-        "view"
+        "admin"
     }
 
     /// Detect which sidenav route is active based on URL path.
@@ -32,7 +32,10 @@ impl SidenavRoutes {
     pub fn from_path(path: &str) -> Self {
         use strum::IntoEnumIterator;
         // Iterate in reverse to match higher numbers first (Sidenav10 before Sidenav01)
-        Self::iter().rev().find(|route| path.contains(route.as_ref())).unwrap_or(Self::Sidenav01)
+        Self::iter()
+            .rev()
+            .find(|route| path.contains(route.as_ref()))
+            .unwrap_or(Self::Sidenav01)
     }
 
     pub fn to_route(self) -> String {
@@ -50,14 +53,14 @@ impl SidenavRoutes {
 
 #[derive(Clone, Copy, Display, AsRefStr, IntoStaticStr, EnumString, EnumIter, Debug, PartialEq)]
 #[strum(serialize_all = "kebab-case")]
-pub enum DocsRoutes {
-    Components,
+pub enum ExplonzRoutes {
+    Spots,
     Hooks,
 }
 
-impl DocsRoutes {
+impl ExplonzRoutes {
     pub fn base_segment() -> &'static str {
-        "docs"
+        "explonz"
     }
 
     pub fn to_title(self) -> String {
@@ -71,21 +74,26 @@ impl DocsRoutes {
 
 #[derive(Clone, Copy, Display, AsRefStr, IntoStaticStr, EnumString, EnumIter, Debug, PartialEq)]
 #[strum(serialize_all = "kebab-case")]
-pub enum ComponentsRoutes {
-    Accordion,
+pub enum SpotsRoutes {
+    Addition,
     Alert,
     AlertDialog,
     Button,
 }
 
-impl ComponentsRoutes {
+impl SpotsRoutes {
     pub fn base_segment() -> &'static str {
         "components"
     }
 
     // http://localhost:3000/view/{sidenav_route}/docs/components
     pub fn base_url_with_sidenav(sidenav: SidenavRoutes) -> String {
-        format!("/{}/{}/{}", sidenav.to_route(), DocsRoutes::base_segment(), DocsRoutes::Components.as_ref())
+        format!(
+            "/{}/{}/{}",
+            sidenav.to_route(),
+            ExplonzRoutes::base_segment(),
+            ExplonzRoutes::Spots.as_ref()
+        )
     }
 
     // http://localhost:3000/view/{sidenav_route}/docs/components/XXXXXXX
@@ -117,7 +125,12 @@ impl HooksRoutes {
 
     // http://localhost:3000/view/{sidenav_route}/docs/hooks
     pub fn base_url_with_sidenav(sidenav: SidenavRoutes) -> String {
-        format!("/{}/{}/{}", sidenav.to_route(), DocsRoutes::base_segment(), DocsRoutes::Hooks.as_ref())
+        format!(
+            "/{}/{}/{}",
+            sidenav.to_route(),
+            ExplonzRoutes::base_segment(),
+            ExplonzRoutes::Hooks.as_ref()
+        )
     }
 
     // http://localhost:3000/view/{sidenav_route}/docs/hooks/XXXXXXX

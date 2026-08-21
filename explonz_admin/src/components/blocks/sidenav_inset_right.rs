@@ -1,5 +1,6 @@
 use icons::PanelLeft;
 use leptos::prelude::*;
+use leptos_router::components::Outlet;
 use leptos_router::hooks::use_location;
 
 use super::sidenav01::Sidenav01MobileSheet;
@@ -13,7 +14,7 @@ use super::sidenav08::Sidenav08MobileSheet;
 use super::sidenav09::Sidenav09MobileSheet;
 use super::sidenav10::Sidenav10MobileSheet;
 use super::sidenav11::Sidenav11MobileSheet;
-use super::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use super::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::hooks::use_breadcrumb::use_breadcrumb_from_segment;
 use crate::components::ui::breadcrumb::{
     Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
@@ -26,21 +27,26 @@ use crate::components::ui::sidenav::{SidenavInset, SidenavTrigger, SidenavVarian
 pub fn SidenavInsetRight(
     #[prop(into, optional)] data_variant: Option<SidenavVariant>,
 ) -> impl IntoView {
-    let breadcrumb_items = use_breadcrumb_from_segment(DocsRoutes::base_segment());
+    let breadcrumb_items = use_breadcrumb_from_segment(ExplonzRoutes::base_segment());
 
     // For mobile sheet - determine current section and sidenav route from URL
     let location = use_location();
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) {
-            DocsRoutes::Components
+        if path.contains(ExplonzRoutes::Spots.as_ref()) {
+            ExplonzRoutes::Spots
         } else {
-            DocsRoutes::Hooks
+            ExplonzRoutes::Hooks
         }
     });
 
+    // log!("current_section = {:?}", current_section);
+
     // Detect which sidenav route is active based on URL
     let sidenav_route = Memo::new(move |_| SidenavRoutes::from_path(&location.pathname.get()));
+    // log!("sidenav_route = {:?}", sidenav_route);
+
+    // log!("data_variant = {:?}", data_variant.iter().last());
 
     view! {
         <SidenavInset attr:data-variant=data_variant.map(|v| v.to_string())>
@@ -49,8 +55,8 @@ pub fn SidenavInsetRight(
                     // * Mobile Sheet trigger - visible only on mobile
                     // Render appropriate mobile sheet based on sidenav route
                     {move || match sidenav_route.get() {
-                        SidenavRoutes::Sidenav02 => {
-                            view! { <Sidenav02MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav02 /> }
+                        SidenavRoutes::Home => {
+                            view! { <Sidenav02MobileSheet current_section sidenav_route=SidenavRoutes::Home /> }
                                 .into_any()
                         }
                         SidenavRoutes::Sidenav03 => {
@@ -135,12 +141,13 @@ pub fn SidenavInsetRight(
             </header>
 
             <div class="flex flex-col flex-1 gap-4 p-4 pt-0">
-                <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div class="rounded-xl bg-muted/50 aspect-video"></div>
-                    <div class="rounded-xl bg-muted/50 aspect-video"></div>
-                    <div class="rounded-xl bg-muted/50 aspect-video"></div>
-                </div>
-                <div class="flex-1 rounded-xl bg-muted/50 min-h-[100vh] md:min-h-min"></div>
+                // <div class="grid auto-rows-min gap-4 md:grid-cols-3">
+                //     <div class="rounded-xl bg-muted/50 aspect-video"></div>
+                //     <div class="rounded-xl bg-muted/50 aspect-video"></div>
+                //     <div class="rounded-xl bg-muted/50 aspect-video"></div>
+                // </div>
+                // <div class="flex-1 rounded-xl bg-muted/50 min-h-[100vh] md:min-h-min"></div>
+                <Outlet />
             </div>
         </SidenavInset>
     }

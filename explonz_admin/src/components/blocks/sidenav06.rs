@@ -4,7 +4,7 @@ use leptos_router::{MatchNestedRoutes, StaticSegment};
 use leptos_router::components::{Outlet, ParentRoute};
 use leptos_router::hooks::use_location;
 
-use crate::components::blocks::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use crate::components::blocks::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::blocks::sidenav_routes_selector::SidenavRoutesSelector;
 use crate::components::blocks::sidenav_routes_simplified::SidenavRoutesSimplified;
 use crate::components::demos::demo_dropdown_menu_user::DemoDropdownMenuUser;
@@ -49,7 +49,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) { DocsRoutes::Components } else { DocsRoutes::Hooks }
+        if path.contains(ExplonzRoutes::Spots.as_ref()) { ExplonzRoutes::Spots } else { ExplonzRoutes::Hooks }
     });
 
     view! {
@@ -70,7 +70,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 
 /// Shared sidenav content used by both desktop Sidenav and mobile Sheet
 #[component]
-fn Sidenav06Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+fn Sidenav06Content(current_section: Memo<ExplonzRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
     view! {
         <SidenavHeader>
             <SidenavRoutesSelector current_section sidenav_route />
@@ -146,7 +146,7 @@ fn Sidenav06Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
 /* ========================================================== */
 
 #[component]
-pub fn Sidenav06MobileSheet(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+pub fn Sidenav06MobileSheet(current_section: Memo<ExplonzRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
     view! {
         <Sheet>
             <div class="md:hidden">

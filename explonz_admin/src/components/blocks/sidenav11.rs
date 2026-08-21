@@ -5,7 +5,7 @@ use leptos_router::hooks::use_location;
 #[allow(unused_imports)]
 use leptos_router::{MatchNestedRoutes, StaticSegment};
 
-use crate::components::blocks::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use crate::components::blocks::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::blocks::sidenav_routes_selector::SidenavRoutesSelector;
 use crate::components::blocks::sidenav_routes_simplified::SidenavRoutesSimplified;
 use crate::components::demos::demo_dropdown_menu_user::DemoDropdownMenuUser;
@@ -50,10 +50,10 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) {
-            DocsRoutes::Components
+        if path.contains(ExplonzRoutes::Spots.as_ref()) {
+            ExplonzRoutes::Spots
         } else {
-            DocsRoutes::Hooks
+            ExplonzRoutes::Hooks
         }
     });
 
@@ -78,7 +78,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 /// Shared sidenav content used by both desktop Sidenav and mobile Sheet
 #[component]
 fn Sidenav11Content(
-    current_section: Memo<DocsRoutes>,
+    current_section: Memo<ExplonzRoutes>,
     sidenav_route: SidenavRoutes,
 ) -> impl IntoView {
     let sheet_ctx = use_context::<SheetContext>();
@@ -96,8 +96,8 @@ fn Sidenav11Content(
                         {move || {
                             let sheet_target_id = sheet_ctx.as_ref().map(|ctx| ctx.target_id.clone());
                             match current_section.get() {
-                                DocsRoutes::Components => COMPONENT_LINKS,
-                                DocsRoutes::Hooks => HOOKS_LINKS,
+                                ExplonzRoutes::Spots => COMPONENT_LINKS,
+                                ExplonzRoutes::Hooks => HOOKS_LINKS,
                             }
                                 .iter()
                                 .map(|(href, title)| {
@@ -132,7 +132,7 @@ fn Sidenav11Content(
 /// Mobile sheet slides from the right to match the right-side sidenav
 #[component]
 pub fn Sidenav11MobileSheet(
-    current_section: Memo<DocsRoutes>,
+    current_section: Memo<ExplonzRoutes>,
     sidenav_route: SidenavRoutes,
 ) -> impl IntoView {
     view! {

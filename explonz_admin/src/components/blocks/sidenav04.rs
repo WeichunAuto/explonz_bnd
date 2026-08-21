@@ -4,7 +4,7 @@ use leptos_router::{MatchNestedRoutes, StaticSegment};
 use leptos_router::components::{Outlet, ParentRoute};
 use leptos_router::hooks::use_location;
 
-use crate::components::blocks::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use crate::components::blocks::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::blocks::sidenav_routes_selector::SidenavRoutesSelector;
 use crate::components::blocks::sidenav_routes_simplified::SidenavRoutesSimplified;
 use crate::components::demos::demo_dropdown_menu_user::DemoDropdownMenuUser;
@@ -47,7 +47,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
     // Determine current section from URL
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) { DocsRoutes::Components } else { DocsRoutes::Hooks }
+        if path.contains(ExplonzRoutes::Spots.as_ref()) { ExplonzRoutes::Spots } else { ExplonzRoutes::Hooks }
     });
 
     view! {
@@ -72,7 +72,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 
 /// Shared sidenav content used by both desktop Sidenav and mobile Sheet
 #[component]
-fn Sidenav04Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+fn Sidenav04Content(current_section: Memo<ExplonzRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
     // Try to get SheetContext - will be Some when inside a Sheet (mobile), None otherwise (desktop)
     let sheet_ctx = use_context::<SheetContext>();
 
@@ -85,8 +85,8 @@ fn Sidenav04Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
             {move || {
                 let sheet_target_id = sheet_ctx.as_ref().map(|ctx| ctx.target_id.clone());
                 let links = match current_section.get() {
-                    DocsRoutes::Components => COMPONENT_LINKS,
-                    DocsRoutes::Hooks => HOOKS_LINKS,
+                    ExplonzRoutes::Spots => COMPONENT_LINKS,
+                    ExplonzRoutes::Hooks => HOOKS_LINKS,
                 };
                 view! {
                     <SidenavGroup>
@@ -128,7 +128,7 @@ fn Sidenav04Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
 
 /// Mobile sheet containing sidenav content - uses the proper Sheet component
 #[component]
-pub fn Sidenav04MobileSheet(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+pub fn Sidenav04MobileSheet(current_section: Memo<ExplonzRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
     view! {
         <Sheet>
             // * Trigger visible only on mobile, positioned in header flow

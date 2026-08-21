@@ -5,7 +5,7 @@ use leptos_router::hooks::use_location;
 #[allow(unused_imports)]
 use leptos_router::{MatchNestedRoutes, StaticSegment};
 
-use crate::components::blocks::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use crate::components::blocks::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::blocks::sidenav_routes_selector::SidenavRoutesSelector;
 use crate::components::blocks::sidenav_routes_simplified::SidenavRoutesSimplified;
 use crate::components::demos::demo_dropdown_menu_user::DemoDropdownMenuUser;
@@ -50,7 +50,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
     // Determine current section from URL
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) { DocsRoutes::Components } else { DocsRoutes::Hooks }
+        if path.contains(ExplonzRoutes::Spots.as_ref()) { ExplonzRoutes::Spots } else { ExplonzRoutes::Hooks }
     });
 
     view! {
@@ -126,7 +126,7 @@ pub fn FirstSidenav(data_collapsible: SidenavCollapsible, sidenav_route: Sidenav
                                     href=format!(
                                         "/{}/docs/{}",
                                         sidenav_route.to_route(),
-                                        DocsRoutes::Components.as_ref(),
+                                        ExplonzRoutes::Spots.as_ref(),
                                     )
                                     class=SHARED_TOOLTIP_CLASS
                                     attr:data-tooltip="Components"
@@ -137,7 +137,7 @@ pub fn FirstSidenav(data_collapsible: SidenavCollapsible, sidenav_route: Sidenav
                             <SidenavMenuItem attr:data-sidenav="menu-item">
                                 <SidenavMenuButton
                                     attr:data-sidenav="menu-button"
-                                    href=format!("/{}/docs/{}", sidenav_route.to_route(), DocsRoutes::Hooks.as_ref())
+                                    href=format!("/{}/docs/{}", sidenav_route.to_route(), ExplonzRoutes::Hooks.as_ref())
                                     class=SHARED_TOOLTIP_CLASS
                                     attr:data-tooltip="Hooks"
                                 >
@@ -166,7 +166,7 @@ pub fn FirstSidenav(data_collapsible: SidenavCollapsible, sidenav_route: Sidenav
 
 /// Shared sidenav content for mobile Sheet - shows the SecondSidenav navigation
 #[component]
-fn Sidenav09Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+fn Sidenav09Content(current_section: Memo<ExplonzRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
     // Try to get SheetContext - will be Some when inside a Sheet (mobile), None otherwise (desktop)
     let sheet_ctx = use_context::<SheetContext>();
 
@@ -179,8 +179,8 @@ fn Sidenav09Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
             {move || {
                 let sheet_target_id = sheet_ctx.as_ref().map(|ctx| ctx.target_id.clone());
                 let links = match current_section.get() {
-                    DocsRoutes::Components => COMPONENT_LINKS,
-                    DocsRoutes::Hooks => HOOKS_LINKS,
+                    ExplonzRoutes::Spots => COMPONENT_LINKS,
+                    ExplonzRoutes::Hooks => HOOKS_LINKS,
                 };
 
                 view! {
@@ -235,7 +235,7 @@ fn Sidenav09Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
 }
 
 #[component]
-pub fn SecondSidenav(data_collapsible: SidenavCollapsible, current_section: Memo<DocsRoutes>) -> impl IntoView {
+pub fn SecondSidenav(data_collapsible: SidenavCollapsible, current_section: Memo<ExplonzRoutes>) -> impl IntoView {
     view! {
         <Sidenav data_collapsible=data_collapsible class="hidden flex-1 md:flex">
             <SidenavHeader attr:data-sidenav="header" class="p-3 border-b">
@@ -257,8 +257,8 @@ pub fn SecondSidenav(data_collapsible: SidenavCollapsible, current_section: Memo
                                         <SidenavMenu>
                                             {move || {
                                                 let links = match current_section.get() {
-                                                    DocsRoutes::Components => COMPONENT_LINKS,
-                                                    DocsRoutes::Hooks => HOOKS_LINKS,
+                                                    ExplonzRoutes::Spots => COMPONENT_LINKS,
+                                                    ExplonzRoutes::Hooks => HOOKS_LINKS,
                                                 };
                                                 links
                                                     .iter()
@@ -285,7 +285,7 @@ pub fn SecondSidenav(data_collapsible: SidenavCollapsible, current_section: Memo
 
 /// Mobile sheet containing sidenav content - uses the proper Sheet component
 #[component]
-pub fn Sidenav09MobileSheet(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+pub fn Sidenav09MobileSheet(current_section: Memo<ExplonzRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
     view! {
         <Sheet>
             // * Trigger visible only on mobile, positioned in header flow

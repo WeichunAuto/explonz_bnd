@@ -1,5 +1,5 @@
 use heck::ToTitleCase;
-use leptos::prelude::*;
+use leptos::{logging::log, prelude::*};
 use leptos_router::hooks::use_location;
 
 const LAST_SEGMENT_INDEX: usize = 1;
@@ -18,13 +18,23 @@ pub fn use_breadcrumb_after_segment(start_segment: &str) -> Memo<Vec<(String, St
 /*                     ✨ FUNCTIONS ✨                        */
 /* ========================================================== */
 
-fn build_breadcrumb_items(start_segment: &str, inclusive: bool) -> Memo<Vec<(String, String, bool)>> {
+fn build_breadcrumb_items(
+    start_segment: &str,
+    inclusive: bool,
+) -> Memo<Vec<(String, String, bool)>> {
     let location = use_location();
     let start_segment = start_segment.to_string();
 
     Memo::new(move |_| {
         let path = location.pathname.get();
-        let segments: Vec<String> = path.split('/').filter(|segment| !segment.is_empty()).map(String::from).collect();
+        let segments: Vec<String> = path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .map(String::from)
+            .collect();
+
+        // leptos::logging::log!("{:?}", segments);
+        // log!("start_segment = {}", start_segment);
 
         segments
             .iter()
@@ -42,7 +52,11 @@ fn build_breadcrumb_items(start_segment: &str, inclusive: bool) -> Memo<Vec<(Str
                     .skip(actual_start_idx)
                     .map(|(i, segment)| {
                         let path = segments.get(..=i).map(|s| s.join("/")).unwrap_or_default();
-                        (segment.to_title_case(), format!("/{path}"), i == segments.len() - LAST_SEGMENT_INDEX)
+                        (
+                            segment.to_title_case(),
+                            format!("/{path}"),
+                            i == segments.len() - LAST_SEGMENT_INDEX,
+                        )
                     })
                     .collect()
             })

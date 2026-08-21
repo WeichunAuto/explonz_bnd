@@ -1,10 +1,10 @@
 use leptos::prelude::*;
 
 #[component]
-pub fn SpotList() -> impl IntoView {
+pub fn SpotAddition() -> impl IntoView {
     view! {
         <div>
-            <h1>"Spots List"</h1>
+            <h1>"Edit Adition"</h1>
         </div>
     }
 }

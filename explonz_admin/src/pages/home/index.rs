@@ -4,7 +4,7 @@ use leptos_router::components::{Outlet, ParentRoute, Route};
 use leptos_router::hooks::use_location;
 use leptos_router::{MatchNestedRoutes, StaticSegment};
 
-use crate::components::blocks::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use crate::components::blocks::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::blocks::sidenav_routes_selector::SidenavRoutesSelector;
 use crate::components::blocks::sidenav_routes_simplified::SidenavRoutesSimplified;
 use crate::components::demos::demo_dropdown_menu_user::DemoDropdownMenuUser;
@@ -25,9 +25,9 @@ pub fn Sidenav02Routes() -> impl MatchNestedRoutes + Clone {
     view! {
         <ParentRoute path=StaticSegment(SidenavRoutes::view_segment()) view=|| view! { <Outlet /> }>
             <ParentRoute
-                path=StaticSegment(SidenavRoutes::Sidenav02.as_ref())
+                path=StaticSegment(SidenavRoutes::Home.as_ref())
                 // path=StaticSegment("sidenav-02")
-                view=move || view! { <SidenavLayout sidenav_route=SidenavRoutes::Sidenav02 /> }
+                view=move || view! { <SidenavLayout sidenav_route=SidenavRoutes::Home /> }
             >
 
                 <SidenavRoutesSimplified />
@@ -49,10 +49,10 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
     // Determine current section from URL
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) {
-            DocsRoutes::Components
+        if path.contains(ExplonzRoutes::Spots.as_ref()) {
+            ExplonzRoutes::Spots
         } else {
-            DocsRoutes::Hooks
+            ExplonzRoutes::Hooks
         }
     });
 
@@ -79,7 +79,7 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 /// Shared sidenav content used by both desktop Sidenav and mobile Sheet
 #[component]
 fn Sidenav02Content(
-    current_section: Memo<DocsRoutes>,
+    current_section: Memo<ExplonzRoutes>,
     sidenav_route: SidenavRoutes,
 ) -> impl IntoView {
     // Try to get SheetContext - will be Some when inside a Sheet (mobile), None otherwise (desktop)
@@ -94,8 +94,8 @@ fn Sidenav02Content(
             {move || {
                 let sheet_target_id = sheet_ctx.as_ref().map(|ctx| ctx.target_id.clone());
                 let links = match current_section.get() {
-                    DocsRoutes::Components => COMPONENT_LINKS,
-                    DocsRoutes::Hooks => HOOKS_LINKS,
+                    ExplonzRoutes::Spots => SPOTS_LINKS,
+                    ExplonzRoutes::Hooks => HOOKS_LINKS,
                 };
 
                 view! {
@@ -154,7 +154,7 @@ fn Sidenav02Content(
 /// This component renders only the Sheet content, the trigger is in the header
 #[component]
 pub fn Sidenav02MobileSheet(
-    current_section: Memo<DocsRoutes>,
+    current_section: Memo<ExplonzRoutes>,
     sidenav_route: SidenavRoutes,
 ) -> impl IntoView {
     view! {
@@ -186,9 +186,9 @@ pub fn Sidenav02MobileSheet(
 
 // * A simple example with basic links.
 
-const COMPONENT_LINKS: &[(&str, &str)] = &[
-    ("/view/sidenav02/docs/components/accordion", "Accordion"),
-    ("/view/sidenav02/docs/components/alert", "Alert"),
+const SPOTS_LINKS: &[(&str, &str)] = &[
+    ("/admin/home/explonz/spots/addition", "Addition"),
+    ("/admin/home/explonz/spots/spot_list", "Spots List"),
     (
         "/view/sidenav02/docs/components/alert-dialog",
         "Alert Dialog",

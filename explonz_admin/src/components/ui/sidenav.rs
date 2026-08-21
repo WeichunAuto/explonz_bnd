@@ -11,7 +11,7 @@ mod components {
     clx! {SidenavInset, div, "bg-background relative flex w-full flex-1 flex-col data-[variant=Inset]:rounded-lg data-[variant=Inset]:border data-[variant=Inset]:border-sidenav-border data-[variant=Inset]:shadow-sm data-[variant=Inset]:m-2"}
     // * data-[], not group-data-[]
     clx! {SidenavInner, div, "flex flex-col w-full h-full bg-sidenav data-[variant=Floating]:rounded-lg data-[variant=Floating]:border data-[variant=Floating]:border-sidenav-border data-[variant=Floating]:shadow-sm"}
-    clx! {SidenavHeader, div, "flex flex-col gap-2 p-2"}
+    clx! { SidenavHeader, div, "flex flex-col gap-2 p-2"}
     clx! {SidenavMenu, ul, "flex flex-col gap-1 w-full min-w-0"}
     clx! {SidenavMenuSub, ul, "border-sidenav-border mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l px-2.5 py-0.5 group-data-[collapsible=Icon]:hidden"}
     clx! {SidenavMenuItem, li, "relative group/menu-item"}

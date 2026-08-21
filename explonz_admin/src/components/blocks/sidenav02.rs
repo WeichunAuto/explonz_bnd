@@ -1,19 +1,23 @@
 use icons::PanelLeft;
 use leptos::prelude::*;
-use leptos_router::{MatchNestedRoutes, StaticSegment};
 use leptos_router::components::{Outlet, ParentRoute};
 use leptos_router::hooks::use_location;
+use leptos_router::{MatchNestedRoutes, StaticSegment};
 
-use crate::components::blocks::sidenav_routes::{DocsRoutes, SidenavRoutes};
+use crate::components::blocks::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::blocks::sidenav_routes_selector::SidenavRoutesSelector;
 use crate::components::blocks::sidenav_routes_simplified::SidenavRoutesSimplified;
 use crate::components::demos::demo_dropdown_menu_user::DemoDropdownMenuUser;
-use crate::components::ui::accordion::{AccordionContent, AccordionHeader, AccordionItem, AccordionTitle, AccordionTrigger};
+use crate::components::ui::accordion::{
+    AccordionContent, AccordionHeader, AccordionItem, AccordionTitle, AccordionTrigger,
+};
 use crate::components::ui::button::{ButtonSize, ButtonVariant};
-use crate::components::ui::sheet::{Sheet, SheetContent, SheetContext, SheetDirection, SheetTrigger};
+use crate::components::ui::sheet::{
+    Sheet, SheetContent, SheetContext, SheetDirection, SheetTrigger,
+};
 use crate::components::ui::sidenav::{
-    Sidenav, SidenavContent, SidenavFooter, SidenavGroup, SidenavGroupContent, SidenavGroupLabel, SidenavHeader,
-    SidenavLink, SidenavMenu, SidenavMenuItem, SidenavWrapper,
+    Sidenav, SidenavContent, SidenavFooter, SidenavGroup, SidenavGroupContent, SidenavGroupLabel,
+    SidenavHeader, SidenavLink, SidenavMenu, SidenavMenuItem, SidenavWrapper,
 };
 
 /*
@@ -26,8 +30,8 @@ pub fn Sidenav02Routes() -> impl MatchNestedRoutes + Clone {
     view! {
         <ParentRoute path=StaticSegment(SidenavRoutes::view_segment()) view=|| view! { <Outlet /> }>
             <ParentRoute
-                path=StaticSegment(SidenavRoutes::Sidenav02.as_ref())
-                view=move || view! { <SidenavLayout sidenav_route=SidenavRoutes::Sidenav02 /> }
+                path=StaticSegment(SidenavRoutes::Home.as_ref())
+                view=move || view! { <SidenavLayout sidenav_route=SidenavRoutes::Home /> }
             >
                 <SidenavRoutesSimplified />
             </ParentRoute>
@@ -48,7 +52,11 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
     // Determine current section from URL
     let current_section = Memo::new(move |_| {
         let path = location.pathname.get();
-        if path.contains(DocsRoutes::Components.as_ref()) { DocsRoutes::Components } else { DocsRoutes::Hooks }
+        if path.contains(ExplonzRoutes::Spots.as_ref()) {
+            ExplonzRoutes::Spots
+        } else {
+            ExplonzRoutes::Hooks
+        }
     });
 
     view! {
@@ -73,7 +81,10 @@ pub fn SidenavLayout(sidenav_route: SidenavRoutes) -> impl IntoView {
 
 /// Shared sidenav content used by both desktop Sidenav and mobile Sheet
 #[component]
-fn Sidenav02Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+fn Sidenav02Content(
+    current_section: Memo<ExplonzRoutes>,
+    sidenav_route: SidenavRoutes,
+) -> impl IntoView {
     // Try to get SheetContext - will be Some when inside a Sheet (mobile), None otherwise (desktop)
     let sheet_ctx = use_context::<SheetContext>();
 
@@ -86,8 +97,8 @@ fn Sidenav02Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
             {move || {
                 let sheet_target_id = sheet_ctx.as_ref().map(|ctx| ctx.target_id.clone());
                 let links = match current_section.get() {
-                    DocsRoutes::Components => COMPONENT_LINKS,
-                    DocsRoutes::Hooks => HOOKS_LINKS,
+                    ExplonzRoutes::Spots => COMPONENT_LINKS,
+                    ExplonzRoutes::Hooks => HOOKS_LINKS,
                 };
 
                 view! {
@@ -145,7 +156,10 @@ fn Sidenav02Content(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRou
 /// Mobile sheet containing sidenav content - uses the proper Sheet component
 /// This component renders only the Sheet content, the trigger is in the header
 #[component]
-pub fn Sidenav02MobileSheet(current_section: Memo<DocsRoutes>, sidenav_route: SidenavRoutes) -> impl IntoView {
+pub fn Sidenav02MobileSheet(
+    current_section: Memo<ExplonzRoutes>,
+    sidenav_route: SidenavRoutes,
+) -> impl IntoView {
     view! {
         <Sheet>
             // * Trigger visible only on mobile, positioned in header flow
@@ -176,9 +190,12 @@ pub fn Sidenav02MobileSheet(current_section: Memo<DocsRoutes>, sidenav_route: Si
 // * A simple example with basic links.
 
 const COMPONENT_LINKS: &[(&str, &str)] = &[
-    ("/view/sidenav02/docs/components/accordion", "Accordion"),
-    ("/view/sidenav02/docs/components/alert", "Alert"),
-    ("/view/sidenav02/docs/components/alert-dialog", "Alert Dialog"),
+    ("/admin/home/explonz/spots/addition", "Addition"),
+    ("/admin/home/explonz/spots/spot_list", "Spots List"),
+    (
+        "/view/sidenav02/docs/components/alert-dialog",
+        "Alert Dialog",
+    ),
     ("/view/sidenav02/docs/components/button", "Button"),
     ("/view/sidenav02/docs/components/card", "Card"),
     ("/view/sidenav02/docs/components/checkbox", "Checkbox"),
@@ -186,7 +203,13 @@ const COMPONENT_LINKS: &[(&str, &str)] = &[
 ];
 
 const HOOKS_LINKS: &[(&str, &str)] = &[
-    ("/view/sidenav02/docs/hooks/use-copy-clipboard", "Use Copy Clipboard"),
-    ("/view/sidenav02/docs/hooks/use-lock-body-scroll", "Use Lock Body Scroll"),
+    (
+        "/view/sidenav02/docs/hooks/use-copy-clipboard",
+        "Use Copy Clipboard",
+    ),
+    (
+        "/view/sidenav02/docs/hooks/use-lock-body-scroll",
+        "Use Lock Body Scroll",
+    ),
     ("/view/sidenav02/docs/hooks/use-random", "Use Random"),
 ];

@@ -8,17 +8,7 @@ use strum::{AsRefStr, Display, EnumIter, EnumString, IntoStaticStr};
 #[derive(Clone, Copy, Display, AsRefStr, IntoStaticStr, EnumString, EnumIter, Debug, PartialEq)]
 #[strum(serialize_all = "kebab-case")]
 pub enum SidenavRoutes {
-    Sidenav01,
     Home,
-    Sidenav03,
-    Sidenav04,
-    Sidenav05,
-    Sidenav06,
-    Sidenav07,
-    Sidenav08,
-    Sidenav09,
-    Sidenav10,
-    Sidenav11,
 }
 
 impl SidenavRoutes {
@@ -35,7 +25,7 @@ impl SidenavRoutes {
         Self::iter()
             .rev()
             .find(|route| path.contains(route.as_ref()))
-            .unwrap_or(Self::Sidenav01)
+            .unwrap_or(Self::Home)
     }
 
     pub fn to_route(self) -> String {

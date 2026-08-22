@@ -3,17 +3,17 @@ use leptos::prelude::*;
 use leptos_router::components::Outlet;
 use leptos_router::hooks::use_location;
 
-use super::sidenav01::Sidenav01MobileSheet;
+// use super::sidenav01::Sidenav01MobileSheet;
 use super::sidenav02::Sidenav02MobileSheet;
-use super::sidenav03::Sidenav03MobileSheet;
-use super::sidenav04::Sidenav04MobileSheet;
-use super::sidenav05::Sidenav05MobileSheet;
-use super::sidenav06::Sidenav06MobileSheet;
-use super::sidenav07::Sidenav07MobileSheet;
-use super::sidenav08::Sidenav08MobileSheet;
-use super::sidenav09::Sidenav09MobileSheet;
-use super::sidenav10::Sidenav10MobileSheet;
-use super::sidenav11::Sidenav11MobileSheet;
+// use super::sidenav03::Sidenav03MobileSheet;
+// use super::sidenav04::Sidenav04MobileSheet;
+// use super::sidenav05::Sidenav05MobileSheet;
+// use super::sidenav06::Sidenav06MobileSheet;
+// use super::sidenav07::Sidenav07MobileSheet;
+// use super::sidenav08::Sidenav08MobileSheet;
+// use super::sidenav09::Sidenav09MobileSheet;
+// use super::sidenav10::Sidenav10MobileSheet;
+// use super::sidenav11::Sidenav11MobileSheet;
 use super::sidenav_routes::{ExplonzRoutes, SidenavRoutes};
 use crate::components::hooks::use_breadcrumb::use_breadcrumb_from_segment;
 use crate::components::ui::breadcrumb::{
@@ -57,47 +57,6 @@ pub fn SidenavInsetRight(
                     {move || match sidenav_route.get() {
                         SidenavRoutes::Home => {
                             view! { <Sidenav02MobileSheet current_section sidenav_route=SidenavRoutes::Home /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav03 => {
-                            view! { <Sidenav03MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav03 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav04 => {
-                            view! { <Sidenav04MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav04 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav05 => {
-                            view! { <Sidenav05MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav05 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav06 => {
-                            view! { <Sidenav06MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav06 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav07 => {
-                            view! { <Sidenav07MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav07 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav08 => {
-                            view! { <Sidenav08MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav08 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav09 => {
-                            view! { <Sidenav09MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav09 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav10 => {
-                            view! { <Sidenav10MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav10 /> }
-                                .into_any()
-                        }
-                        SidenavRoutes::Sidenav11 => {
-                            view! { <Sidenav11MobileSheet current_section sidenav_route=SidenavRoutes::Sidenav11 /> }
-                                .into_any()
-                        }
-                        route => {
-                            // Default to Sidenav01 mobile sheet for all other routes
-                            view! { <Sidenav01MobileSheet current_section sidenav_route=route /> }
                                 .into_any()
                         }
                     }} // * Desktop trigger (toggles sidenav collapse) - hidden on mobile

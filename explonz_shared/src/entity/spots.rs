@@ -26,6 +26,9 @@ pub struct Model {
     pub attributes: Json,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
+
+    pub phone: Option<String>,
+    pub website: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

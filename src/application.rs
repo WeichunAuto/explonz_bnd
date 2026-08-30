@@ -5,6 +5,7 @@ use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::Response;
 use axum::Router;
 use bytesize::ByteSize;
+use explonz_shared::common::utils::dir_into_url_path;
 use sea_orm::DatabaseConnection;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
@@ -22,6 +23,8 @@ use tracing::Span;
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
+    pub upload_dir: String,
+    pub public_url: String,
 }
 
 /// Server instance responsible for starting and configuring the HTTP server.
@@ -37,8 +40,12 @@ struct Latency(Duration);
 
 impl AppState {
     /// Creates a new application state with the given database connection.
-    fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    fn new(db: DatabaseConnection, upload_dir: String, public_url: String) -> Self {
+        Self {
+            db,
+            upload_dir,
+            public_url,
+        }
     }
 
     /// Returns a reference to the database connection.
@@ -65,11 +72,21 @@ pub async fn run(router: Router<AppState>) -> anyhow::Result<()> {
     logger::init();
     tracing::info!("Starting the application server......");
 
+    // 加载.env环境变量
+    dotenvy::dotenv().ok();
+
     // Initialize database connection
     let db_connection = database::init().await?;
+    let upload_dir =
+        std::env::var("UPLOAD_DIR").expect("环境变量中必须配置图片上传目录：UPLOAD_DIR！");
+    let public_url =
+        std::env::var("PUBLIC_URL").expect("环境变量中必须配置公共URL地址：PUBLIC_URL！");
+
+    // 确保图片上传目录存在
+    tokio::fs::create_dir_all(&upload_dir).await?;
 
     // Create application state with database connection
-    let app_state = AppState::new(db_connection);
+    let app_state = AppState::new(db_connection, upload_dir, public_url);
 
     // Create server instance and start
     let server = Server::new(AppConfig::get());
@@ -145,8 +162,18 @@ impl Server {
         //  remove trailing slashes from request paths.
         let normalize_path = NormalizePathLayer::trim_trailing_slash();
 
+        use tower_http::services::ServeDir;
+
+        let upload_dir = state.upload_dir.clone();
+
+        // 去掉开头的 "./" 或 "."，确保以 "/" 开头
+        let upload_url_path = dir_into_url_path(&upload_dir);
+
+        // println!("upload_url_path = {}", upload_url_path);
+
         Router::new()
             .merge(router)
+            .nest_service(&upload_url_path, ServeDir::new(&upload_dir))
             .layer(timeout)
             .layer(body_limit)
             .layer(tracing)

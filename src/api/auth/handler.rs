@@ -26,7 +26,7 @@ use std::net::SocketAddr;
 #[debug_handler]
 #[tracing::instrument(name = "login_with_google", skip_all, fields(account = %id_token, IP = %addr))]
 pub async fn login_with_google(
-    State(AppState { db }): State<AppState>,
+    State(AppState { db,.. }): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(GoogleLoginParams { id_token }): Json<GoogleLoginParams>,
 ) -> ApiResult<LoginResponse> {
@@ -45,7 +45,7 @@ pub async fn login_with_google(
 #[debug_handler]
 #[tracing::instrument(name = "login_with_email", skip_all, fields(account = %email, IP = %addr))]
 pub async fn login_with_email(
-    State(AppState { db }): State<AppState>,
+    State(AppState { db,.. }): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     BValidJson(LoginParams { email, password }): BValidJson<LoginParams>,
 ) -> ApiResult<LoginResponse> {
@@ -65,7 +65,7 @@ pub async fn login_with_email(
 #[debug_handler]
 #[tracing::instrument(name = "logout")]
 pub async fn logout(
-    State(AppState { db }): State<AppState>,
+    State(AppState { db,.. }): State<AppState>,
     Path(front_refresh_token): Path<String>,
 ) -> ApiResult<()> {
     tracing::info!(
@@ -84,7 +84,7 @@ pub async fn logout(
 #[debug_handler]
 #[tracing::instrument(name = "send_code for sign up")]
 pub async fn send_code(
-    State(AppState { db }): State<AppState>,
+    State(AppState { db,.. }): State<AppState>,
     BValidJson(SignUpParams { email }): BValidJson<SignUpParams>,
 ) -> ApiResult<()> {
     tracing::info!("Sign up: start verifying the email: {}", email);
@@ -112,7 +112,7 @@ pub async fn send_code(
 #[debug_handler]
 #[tracing::instrument(name = "verify otp code for sign up")]
 pub async fn verify_code(
-    State(AppState { db }): State<AppState>,
+    State(AppState { db,.. }): State<AppState>,
     BValidJson(SignUpWithCodeParams { email, code }): BValidJson<SignUpWithCodeParams>,
 ) -> ApiResult<OtpTokenResponse> {
     verify_otp_code_service(&db, &email, code.as_deref().unwrap_or_default()).await
@@ -121,7 +121,7 @@ pub async fn verify_code(
 // 邮箱注册，设置密码
 #[debug_handler]
 pub async fn setup_password(
-    State(AppState { db }): State<AppState>,
+    State(AppState { db,.. }): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     BValidJson(SetupPasswordParmas {
         email,

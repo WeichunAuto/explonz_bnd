@@ -6,6 +6,13 @@ async fn main() {
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
 
+    // dotenvy::dotenv() 从 CWD 查找 .env，cargo leptos 在 workspace 根运行，
+    // 会加载 explonz_bnd/.env 而非 explonz_admin/.env。
+    // 用 CARGO_MANIFEST_DIR（编译期绝对路径）确保始终加载 explonz_admin/.env。
+    dotenvy::from_path(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".env")
+    ).ok();
+
     let conf = get_configuration(None).unwrap();
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;

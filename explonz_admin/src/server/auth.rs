@@ -21,15 +21,6 @@ pub async fn get_current_user() -> Result<AuthStatus, ServerFnError> {
         None => return Ok(AuthStatus::NotLoggedIn), // 未登录
     };
 
-    // 3. 验证并解码 JWT（get_jwt() 内置签名 + 过期校验）
-    // match get_jwt().decode(&token) {
-    //     Ok(principal) => Ok(Some(AdminUser {
-    //         id: principal.id,
-    //         name: principal.name,
-    //         email: principal.email,
-    //     })),
-    //     Err(_) => Ok(None), // token 无效或过期
-    // }
     match get_jwt().decode(&token) {
         Ok(principal) => Ok(AuthStatus::Authenticated(AdminUser {
             id: principal.id,
@@ -58,12 +49,13 @@ pub async fn admin_login(email: String, password: String) -> Result<(), ServerFn
 
     // 2. 验证 email（constant-time 比较防时序攻击）
     if email != admin_email {
-        return Err(ServerFnError::new("Invalid email or password"));
+        return Err(ServerFnError::new("Invalid email or password e"));
     }
 
+    // println!("admin_hash = {}", admin_hash);
     // 3. 验证 bcrypt 密码
     let valid = verify_password(&password, &admin_hash)
-        .map_err(|_| ServerFnError::new("Invalid email or password"))?;
+        .map_err(|_| ServerFnError::new("Invalid email or password p"))?;
     if !valid {
         return Err(ServerFnError::new("Invalid email or password"));
     }

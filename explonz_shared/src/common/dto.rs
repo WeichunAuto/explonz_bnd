@@ -45,6 +45,9 @@ pub struct SpotDto {
     pub attributes: Value,
     pub created_at: DateTime<FixedOffset>,
     pub updated_at: DateTime<FixedOffset>,
+
+    pub phone: Option<String>,
+    pub website: Option<String>,
 }
 
 #[cfg(feature = "ssr")]
@@ -87,6 +90,8 @@ impl From<crate::entity::spots::Model> for SpotDto {
             attributes: m.attributes,
             created_at: m.created_at.into(),
             updated_at: m.updated_at.into(),
+            phone: m.phone,
+            website: m.website,
         }
     }
 }

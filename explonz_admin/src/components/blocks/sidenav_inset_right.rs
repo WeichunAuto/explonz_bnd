@@ -99,13 +99,7 @@ pub fn SidenavInsetRight(
                 </div>
             </header>
 
-            <div class="flex flex-col flex-1 gap-4 p-4 pt-0">
-                // <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-                //     <div class="rounded-xl bg-muted/50 aspect-video"></div>
-                //     <div class="rounded-xl bg-muted/50 aspect-video"></div>
-                //     <div class="rounded-xl bg-muted/50 aspect-video"></div>
-                // </div>
-                // <div class="flex-1 rounded-xl bg-muted/50 min-h-[100vh] md:min-h-min"></div>
+            <div class=" p-4 pt-0">
                 <Outlet />
             </div>
         </SidenavInset>

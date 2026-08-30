@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 leptos_router = { workspace = true }
 leptos         = { workspace = true }
+server_fn      = { version = "0.8", features = ["multipart"] }
 leptos_axum    = { workspace = true, optional = true }
 axum           = { workspace = true, optional = true }
 tokio          = { workspace = true, optional = true }
@@ -27,11 +28,22 @@ wasm-bindgen = { version = "0.2.127", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 heck = "0.5"
 # explonz_bnd = { path = "../../explonz_bnd" }
+reqwest    = { workspace = true, optional = true }
+serde_json = { workspace = true}
+dotenvy = { workspace = true, optional = true }
 
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { version = "1", features = ["v4", "serde", "js"] }
+# web-sys 由 Leptos 传递依赖，但 FormData / FileList 等 feature 需显式声明
+web-sys = { version = "0.3", features = [
+    "FormData",          # 构造 multipart 数据传给 upload_photo server fn
+    "File",              # 读取拖入/选择的文件对象
+    "FileList",          # input.files() 返回类型
+    "HtmlInputElement",  # event_target::<HtmlInputElement> 取 files()
+    "DataTransfer",      # DragEvent.data_transfer()
+] }
 
 
 [features]
@@ -46,6 +58,8 @@ ssr = [
     "leptos/ssr",
     "explonz_shared/ssr",
     "dep:axum-extra",
+    "dep:reqwest",
+    "dep:dotenvy",
 ]
 # hydrate = ["leptos/hydrate"]
 hydrate = [

@@ -10,6 +10,8 @@ pub mod refresh_tokens;
 pub mod sea_orm_active_enums;
 pub mod seasonal_pickings;
 pub mod sign_up_otps;
+pub mod spot_label_assignments;
+pub mod spot_labels;
 pub mod spot_opening_hours;
 pub mod spots;
 pub mod tip_votes;

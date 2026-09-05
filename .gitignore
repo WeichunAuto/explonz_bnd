@@ -1,4 +1,4 @@
 /target
 /explonz_admin/node_modules
 .env
-/uploads/*
+/uploads

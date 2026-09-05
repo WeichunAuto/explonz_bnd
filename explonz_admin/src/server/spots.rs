@@ -76,8 +76,7 @@ pub async fn create_spot(
     });
 
     // 5. 转发请求到后端（携带 Bearer token）
-    let backend_url =
-        std::env::var("BACKEND_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+    let backend_url = crate::server::backend_url();
 
     let resp = reqwest::Client::new()
         .post(format!("{backend_url}/api/spots/new"))
@@ -159,14 +158,7 @@ pub struct PhotoUploadResponse {
 pub async fn upload_photo(
     data: server_fn::codec::MultipartData,
 ) -> Result<PhotoUploadResponse, ServerFnError> {
-    use axum_extra::extract::CookieJar;
-    use leptos_axum::extract;
-
-    let jar: CookieJar = extract().await?;
-    let token = jar
-        .get("access_token")
-        .map(|c| c.value().to_string())
-        .ok_or_else(|| ServerFnError::new("Not authenticated"))?;
+    let token = crate::server::extract_token().await?;
 
     // server 端：into_inner() 返回 Some(axum::extract::Multipart)
     let mut multipart = data
@@ -236,17 +228,9 @@ pub async fn upload_photo(
 /// 删除图片（通知后端删除本地文件）
 #[server(DeletePhoto, "/api")]
 pub async fn delete_photo(img_id: String) -> Result<(), ServerFnError> {
-    use axum_extra::extract::CookieJar;
-    use leptos_axum::extract;
+    let token = crate::server::extract_token().await?;
 
-    let jar: CookieJar = extract().await?;
-    let token = jar
-        .get("access_token")
-        .map(|c| c.value().to_string())
-        .ok_or_else(|| ServerFnError::new("Not authenticated"))?;
-
-    let backend_url =
-        std::env::var("BACKEND_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+    let backend_url = crate::server::backend_url();
 
     let resp = reqwest::Client::new()
         .delete(format!("{backend_url}/api/images/{img_id}"))

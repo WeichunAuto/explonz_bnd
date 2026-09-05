@@ -7,6 +7,8 @@ pub use super::posts::Entity as Posts;
 pub use super::refresh_tokens::Entity as RefreshTokens;
 pub use super::seasonal_pickings::Entity as SeasonalPickings;
 pub use super::sign_up_otps::Entity as SignUpOtps;
+pub use super::spot_label_assignments::Entity as SpotLabelAssignments;
+pub use super::spot_labels::Entity as SpotLabels;
 pub use super::spot_opening_hours::Entity as SpotOpeningHours;
 pub use super::spots::Entity as Spots;
 pub use super::tip_votes::Entity as TipVotes;

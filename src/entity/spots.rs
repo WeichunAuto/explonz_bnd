@@ -26,6 +26,10 @@ pub struct Model {
     pub attributes: Json,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub phone: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub website: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -34,6 +38,8 @@ pub enum Relation {
     Posts,
     #[sea_orm(has_many = "super::seasonal_pickings::Entity")]
     SeasonalPickings,
+    #[sea_orm(has_many = "super::spot_label_assignments::Entity")]
+    SpotLabelAssignments,
     #[sea_orm(has_many = "super::spot_opening_hours::Entity")]
     SpotOpeningHours,
     #[sea_orm(has_one = "super::tips::Entity")]
@@ -54,6 +60,12 @@ impl Related<super::seasonal_pickings::Entity> for Entity {
     }
 }
 
+impl Related<super::spot_label_assignments::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SpotLabelAssignments.def()
+    }
+}
+
 impl Related<super::spot_opening_hours::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::SpotOpeningHours.def()
@@ -69,6 +81,15 @@ impl Related<super::tips::Entity> for Entity {
 impl Related<super::user_saved_spots::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserSavedSpots.def()
+    }
+}
+
+impl Related<super::spot_labels::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::spot_label_assignments::Relation::SpotLabels.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(super::spot_label_assignments::Relation::Spots.def().rev())
     }
 }
 

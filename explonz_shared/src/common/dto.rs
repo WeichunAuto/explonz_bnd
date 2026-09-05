@@ -50,6 +50,15 @@ pub struct SpotDto {
     pub website: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelDto {
+    pub id: Uuid,
+    pub name: String,
+    pub description: String,
+    pub icon: String,
+}
+
 #[cfg(feature = "ssr")]
 impl From<crate::entity::posts::Model> for PostDto {
     fn from(m: crate::entity::posts::Model) -> Self {

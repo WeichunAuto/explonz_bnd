@@ -5,14 +5,17 @@ use axum::routing::get;
 use axum::Router;
 
 pub mod auth;
+pub mod labels;
 pub mod spots;
 pub(crate) mod user;
+
 /// Creates and configures the application API routes.
 pub async fn build_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(index))
         .nest("/api", user::routes())
         .nest("/api", spots::routes())
+        .nest("/api", labels::routes())
         .route_layer(get_auth_layer())
         .nest("/auth", auth::routes())
         .fallback(fallback)

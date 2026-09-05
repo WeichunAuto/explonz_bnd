@@ -6,7 +6,7 @@ use leptos_router::{MatchNestedRoutes, StaticSegment, WildcardSegment};
 // use super::sidenav_inset_right::SidenavInsetRight;
 use super::sidenav_routes::ExplonzRoutes;
 // use crate::components::ui::sidenav::SidenavVariant;
-use crate::{components::{blocks::sidenav_inset_right::SidenavInsetRight, ui::sidenav::SidenavVariant}, pages::spots::{addition::SpotAddition, list::SpotList}};
+use crate::{components::{blocks::sidenav_inset_right::SidenavInsetRight, ui::sidenav::SidenavVariant}, pages::{labels::list::LabelList, spots::{addition::SpotAddition, list::SpotList}}};
 
 #[component(transparent)]
 pub fn SidenavRoutesSimplified(
@@ -39,6 +39,7 @@ pub fn SidenavRoutesSimplified(
                 // <Route path=WildcardSegment("component_path") view=|| () />
                 <Route path=path!("/addition") view=SpotAddition/>
                 <Route path=path!("/spot_list")     view=SpotList/>
+                <Route path=path!("/label_list")     view=LabelList/>
             </ParentRoute>
 
             // Hooks section - simplified with WildcardSegment

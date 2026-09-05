@@ -6,7 +6,13 @@ use leptos_router::{
 };
 
 use crate::pages::{
-    auth_guard::AuthGuard, dashboard::Dashboard, home::index::{Sidenav02Routes, SidenavLayout}, login::login::LoginPage, posts::list::PostList, spots::{addition::SpotAddition, list::SpotList},
+    auth_guard::AuthGuard,
+    dashboard::Dashboard,
+    home::index::Sidenav02Routes,
+    labels::list::LabelList,
+    login::login::LoginPage,
+    posts::list::PostList,
+    spots::{addition::SpotAddition, list::SpotList},
 };
 
 #[component]
@@ -26,6 +32,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/posts")     view=PostList/>
                     <Route path=path!("/spots")     view=SpotList/>
                     <Route path=path!("/spots/new") view=SpotAddition/>
+                    <Route path=path!("/labels")    view=LabelList/>
                 </ParentRoute>
             </Routes>
         </Router>

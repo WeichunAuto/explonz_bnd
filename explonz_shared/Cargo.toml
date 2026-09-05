@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+strum = "0.28.0"
+strum_macros = "0.28.0"
 sea-orm      = { workspace = true, optional = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }

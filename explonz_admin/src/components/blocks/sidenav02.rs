@@ -192,6 +192,7 @@ pub fn Sidenav02MobileSheet(
 const COMPONENT_LINKS: &[(&str, &str)] = &[
     ("/admin/home/explonz/spots/addition", "Addition"),
     ("/admin/home/explonz/spots/spot_list", "Spots List"),
+    ("/labels", "Labels"),
     (
         "/view/sidenav02/docs/components/alert-dialog",
         "Alert Dialog",

@@ -50,8 +50,9 @@ leptos_meta = "0.8.6"
 tw_merge = { version = "0.1.21", features = ["variant"] }
 icons = { version = "0.18.3", features = ["leptos"] }
 leptos_ui = "0.3.22"
-strum = "0.28.0"
+strum = { version = "0.28.0", features = ["derive"] }
 axum-extra = { version = "0.12.6", features = ["cookie"] }
+strum_macros = "0.28.0"
 
 
 
@@ -98,3 +99,5 @@ leptos_meta.workspace = true
 dotenvy = {workspace = true}
 chrono = {workspace = true}
 explonz_shared = { path = "explonz_shared", features = ["ssr"] }
+strum = {workspace = true}
+strum_macros = {workspace = true}

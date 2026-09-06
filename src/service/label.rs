@@ -1,5 +1,6 @@
 use explonz_shared::{common::dto::LabelDto, entity::spot_labels};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait};
+use uuid::Uuid;
 
 use crate::api::labels::dto::CreateLabelRequest;
 
@@ -36,4 +37,12 @@ pub async fn create_label_service(
         description: result.description,
         icon: result.icon,
     })
+}
+
+// 删除 Label
+pub async fn delete_label_service(db: &DatabaseConnection, id: String) -> anyhow::Result<()> {
+    spot_labels::Entity::delete_by_id(id.parse::<Uuid>().unwrap())
+        .exec(db)
+        .await?;
+    Ok(())
 }

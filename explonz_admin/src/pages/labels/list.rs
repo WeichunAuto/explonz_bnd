@@ -384,7 +384,6 @@ pub fn LabelList() -> impl IntoView {
                                             let id_confirm  = label_id.clone();
                                             let id_delete   = label_id.clone();
                                             let id_cancel   = label_id.clone();
-                                            let label_edit  = label.clone();
 
                                             view! {
                                                 <tr class="border-b last:border-0 hover:bg-muted/30 \
@@ -417,10 +416,13 @@ pub fn LabelList() -> impl IntoView {
                                                                 variant=ButtonVariant::Ghost
                                                                 size=ButtonSize::IconSm
                                                                 on:click=move |_| {
+                                                                    // 点击时从 resource 现取最新数据，避免闭包捕获旧快照
+                                                                    let Some(Ok(list)) = labels.get_untracked() else { return };
+                                                                    let Some(label) = list.into_iter().find(|l| l.id.to_string() == id_edit) else { return };
                                                                     edit_id.set(Some(id_edit.clone()));
-                                                                    form_name.set(label_edit.name.clone());
-                                                                    form_desc.set(label_edit.description.clone());
-                                                                    form_icon.set(label_edit.icon.parse().unwrap());
+                                                                    form_name.set(label.name.clone());
+                                                                    form_desc.set(label.description.clone());
+                                                                    form_icon.set(label.icon.parse().unwrap_or(LabelIcon::Tag));
                                                                     show_icon_picker.set(false);
                                                                     show_form.set(true);
                                                                 }

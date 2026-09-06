@@ -12,9 +12,12 @@ use crate::{
     application::AppState,
     error::ApiError,
     response::{ApiResponse, ApiResult},
-    service::label::{create_label_service, delete_label_service, get_labels_service},
+    service::label::{
+        create_label_service, delete_label_service, get_labels_service, update_label_service,
+    },
 };
 
+// 获取 Labels List
 #[debug_handler]
 #[tracing::instrument(name = "get_labels", skip_all)]
 pub async fn get_labels(State(AppState { db, .. }): State<AppState>) -> ApiResult<Vec<LabelDto>> {
@@ -45,8 +48,8 @@ pub async fn create_label(
 }
 
 // 删除 Label
+#[debug_handler]
 #[tracing::instrument(name = "delete_label", skip_all)]
-
 pub async fn delete_label(
     State(AppState { db, .. }): State<AppState>,
     Path(id): Path<String>,
@@ -56,4 +59,18 @@ pub async fn delete_label(
         .map_err(|e| ApiError::InternalError(e))?;
 
     Ok(ApiResponse::success("OK", None))
+}
+
+// 更新 Label
+#[debug_handler]
+#[tracing::instrument(name = "update_label", skip_all)]
+pub async fn update_label(
+    State(AppState { db, .. }): State<AppState>,
+    Path(id): Path<String>,
+    Json(label_request): Json<CreateLabelRequest>,
+) -> ApiResult<LabelDto> {
+    let label_dto = update_label_service(&db, id, label_request)
+        .await
+        .map_err(|e| ApiError::InternalError(e))?;
+    Ok(ApiResponse::success("OK", Some(label_dto)))
 }

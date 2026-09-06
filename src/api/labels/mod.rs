@@ -1,11 +1,10 @@
 use axum::{
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 
 use crate::{
-    api::labels::handler::{create_label, delete_label, get_labels},
-    application::AppState,
+    api::labels::handler::{create_label, delete_label, get_labels, update_label}, application::AppState,
 };
 
 pub mod dto;
@@ -16,4 +15,5 @@ pub(crate) fn routes() -> Router<AppState> {
         .route("/labels", get(get_labels))
         .route("/labels/new", post(create_label))
         .route("/labels/{label_id}", delete(delete_label))
+        .route("/labels/{label_id}", put(update_label))
 }

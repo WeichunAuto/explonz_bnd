@@ -1171,3 +1171,181 @@ tokio::spawn(crate::service::image_cleanup::run_image_cleanup_task(
 | `explonz_admin/src/pages/spots/addition.rs` | 修改 | Dropzone 组件；调用 server fn 替代 gloo-net |
 | `explonz_admin/Cargo.toml` | 修改 | WASM target 新增 `web-sys` features（FormData、FileList 等） |
 | `explonz_bnd/.env` | 修改 | 新增 `UPLOAD_DIR`、`PUBLIC_URL`、`IMAGE_CLEANUP_INTERVAL_SECS`、`IMAGE_CLEANUP_GRACE_SECS` |
+
+---
+
+## 九、定时清理任务 — 清理逻辑详细分析
+
+### 9.1 孤立文件的来源
+
+| 场景 | 触发路径 | 结果 |
+|------|---------|------|
+| 用户上传图片后关闭页面 | 文件写入磁盘 → spot 从未创建 | 文件孤立于磁盘 |
+| 表单提交时 spot 写库失败（事务回滚） | 文件已存在磁盘 → `photo_urls` 未持久化 | 文件孤立于磁盘 |
+| 用户点删除按钮，`delete_photo` 调用失败 | 前端 `let _ = delete_photo(id).await` 忽略错误 | 文件残留 |
+| 删除 spot 记录但未清理其图片 | 业务层未处理 `photo_urls` 中的文件 | 文件残留 |
+
+**当前代码注释**（`addition.rs:459`）：
+```rust
+// 孤立文件由后端清理任务兜底
+let _ = delete_photo(id).await;
+```
+清理任务尚未实现，本章节定义其完整逻辑。
+
+---
+
+### 9.2 文件与数据库的对应关系
+
+**磁盘文件路径**：
+```
+{UPLOAD_DIR}/spots/images/{filename}
+```
+- `UPLOAD_DIR` 来自环境变量，例如 `./uploads`
+- `filename` 格式为 `{YYYYMMDDHHmmSSfff}.{ext}`，由 `chrono::Local::now().format(...)` 生成
+  - 示例：`20240907143022123.jpg`
+
+**数据库引用**（`spots.photo_urls: text[]`）：
+```
+{PUBLIC_URL}/spots/images/{filename}
+```
+- 示例：`http://192.168.68.50:3005/spots/images/20240907143022123.jpg`
+
+**文件名提取方式**：取 URL 字符串 `split('/')` 的最后一段。
+
+---
+
+### 9.3 孤立文件判定算法
+
+```
+Step 1  扫描磁盘
+        disk_set = { filename | file in readdir("{UPLOAD_DIR}/spots/images/") }
+
+Step 2  查询数据库（展开 photo_urls 数组）
+        SELECT DISTINCT unnest(photo_urls) AS url FROM spots
+        db_set = { last segment of each url }
+
+Step 3  差集
+        orphan_set = disk_set − db_set
+
+Step 4  宽限期过滤
+        cutoff = now() − grace_duration
+        delete_set = { f in orphan_set | mtime(f) < cutoff }
+
+Step 5  删除
+        for f in delete_set: fs::remove_file(f)
+```
+
+**关键参数**：
+- `grace_duration`（宽限期）：推荐 **30 分钟**
+  - 场景：用户正在填表，图片刚上传但 spot 还未提交
+  - 若设置过短，会误删用户正在上传中的图片
+  - 若设置过长，磁盘清理不及时
+- `interval`（执行周期）：推荐 **60 分钟**
+
+---
+
+### 9.4 数据库查询
+
+使用原生 SQL 展开 PostgreSQL 数组列：
+
+```rust
+use sea_orm::{ConnectionTrait, DbBackend, Statement};
+
+let rows = db
+    .query_all(Statement::from_string(
+        DbBackend::Postgres,
+        "SELECT DISTINCT unnest(photo_urls) AS url FROM spots".to_string(),
+    ))
+    .await?;
+
+let db_filenames: HashSet<String> = rows
+    .iter()
+    .filter_map(|row| row.try_get::<String>("", "url").ok())
+    .filter_map(|url| url.split('/').last().map(String::from))
+    .collect();
+```
+
+> SeaORM 没有内置对 PostgreSQL `unnest()` 的抽象，使用原生 SQL 是最简单的方案。
+
+---
+
+### 9.5 文件时效判断
+
+```rust
+use std::time::SystemTime;
+
+let metadata = tokio::fs::metadata(&path).await?;
+let modified: SystemTime = metadata.modified()?;
+let age = SystemTime::now()
+    .duration_since(modified)
+    .unwrap_or(Duration::ZERO);
+
+if age < grace_duration {
+    continue; // 宽限期内，跳过
+}
+```
+
+> 依赖文件系统 `mtime`，在 Linux / macOS / Docker volume 挂载场景下均可用。
+> Windows 的 `mtime` 语义与 Unix 一致，无需特殊处理。
+
+---
+
+### 9.6 任务启动方式
+
+在 `application::run()` 中，`axum::serve` 启动前用 `tokio::spawn` 挂载后台任务：
+
+```rust
+// 读取环境变量（带默认值）
+let interval_secs: u64 = std::env::var("IMAGE_CLEANUP_INTERVAL_SECS")
+    .ok().and_then(|s| s.parse().ok()).unwrap_or(3600);
+let grace_secs: u64 = std::env::var("IMAGE_CLEANUP_GRACE_SECS")
+    .ok().and_then(|s| s.parse().ok()).unwrap_or(1800);
+
+tokio::spawn(crate::service::image_cleanup::run_image_cleanup_task(
+    db_connection.clone(),
+    upload_dir.clone(),
+    interval_secs,
+    grace_secs,
+));
+```
+
+任务结构（`src/service/image_cleanup.rs`）：
+
+```rust
+pub async fn run_image_cleanup_task(
+    db: DatabaseConnection,
+    upload_dir: String,
+    interval_secs: u64,
+    grace_secs: u64,
+) {
+    // 使用 interval + tick，首次 tick 立即返回（跳过），
+    // 实际首次清理在 interval_secs 之后
+    let mut ticker = tokio::time::interval(
+        Duration::from_secs(interval_secs)
+    );
+    ticker.tick().await; // 跳过启动时立即触发
+
+    loop {
+        ticker.tick().await;
+        match cleanup_once(&db, &upload_dir, grace_secs).await {
+            Ok((checked, deleted)) =>
+                tracing::info!("image cleanup: checked={checked}, deleted={deleted}"),
+            Err(e) =>
+                tracing::error!("image cleanup failed: {e}"),
+        }
+    }
+}
+```
+
+---
+
+### 9.7 边界情况处理
+
+| 情况 | 处理方式 |
+|------|---------|
+| `readdir` 失败 | 返回 `Err`，本轮跳过，记录 error 日志 |
+| 数据库查询失败 | 返回 `Err`，本轮跳过，不删任何文件 |
+| 单个文件删除失败（权限/已被删） | 记录 warn 日志，继续处理下一个 |
+| 文件在扫描期间刚被创建（Race） | mtime < cutoff 不成立，宽限期内自动跳过 |
+| `UPLOAD_DIR` 目录不存在 | `readdir` 返回 `Err`，整轮跳过（正常情况启动时已 `create_dir_all`） |
+| `photo_urls` 列中存在 NULL 行 | `unnest(photo_urls)` 会跳过 NULL 数组，`filter_map` 过滤空字符串 |

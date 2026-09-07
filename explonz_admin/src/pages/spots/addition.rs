@@ -495,7 +495,7 @@ pub fn SpotAddition() -> impl IntoView {
                                     .filter_map(|p| {
                                         if let PhotoStatus::Done { url, .. } = p.status.get() {
                                             Some(view! {
-                                                <input type="hidden" name="photo_urls" value=url />
+                                                <input type="hidden" name="photo_urls[]" value=url />
                                             })
                                         } else {
                                             None
@@ -705,7 +705,7 @@ pub fn SpotAddition() -> impl IntoView {
 
                                 // 每个选中 ID 对应一个隐藏字段，随 ActionForm 提交
                                 {move || selected_label_ids.get().into_iter().map(|id| {
-                                    view! { <input type="hidden" name="label_ids" value=id /> }
+                                    view! { <input type="hidden" name="label_ids[]" value=id /> }
                                 }).collect_view()}
                             </div>
 

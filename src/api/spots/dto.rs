@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateSpotRequest {
@@ -7,13 +6,15 @@ pub struct CreateSpotRequest {
     pub location: String,
     pub latitude: f64,
     pub longitude: f64,
-    pub description: String,     // 默认 ""
-    pub photo_urls: Vec<String>, // 默认 []
-    pub attributes: Value,       // 默认 []
+    pub description: String,
+    #[serde(default)]
+    pub photo_urls: Vec<String>,
+    #[serde(default)]
+    pub label_ids: Vec<String>,
 
     pub phone: Option<String>,
     pub website: Option<String>,
-    pub opening_hours: Vec<OpeningHourInput>, // 最多 7 条，每天一条
+    pub opening_hours: Vec<OpeningHourInput>,
 }
 
 #[derive(Debug, Deserialize)]

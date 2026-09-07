@@ -1,3 +1,4 @@
+use crate::server::ApiResp;
 use explonz_shared::common::dto::SpotDto;
 use leptos::prelude::*;
 
@@ -66,8 +67,6 @@ pub async fn create_spot(
         "website": website,
         "opening_hours": opening_hours,
     });
-
-    println!("spot body: {}", body);
 
     // 5. 转发请求到后端（携带 Bearer token）
     let backend_url = crate::server::backend_url();
@@ -160,14 +159,11 @@ pub async fn upload_photo(
         .ok_or_else(|| ServerFnError::new("No multipart data"))?;
 
     while let Ok(Some(field)) = multipart.next_field().await {
-        println!("field name = {:?}", field.name());
-
         if field.name() != Some("file") {
             continue;
         }
         let filename = field.file_name().unwrap_or("upload").to_string();
 
-        // println!("filename = {:?}", filename);
         let content_type = field
             .content_type()
             .map(|m| m.to_string())
@@ -201,12 +197,7 @@ pub async fn upload_photo(
             return Err(ServerFnError::new(format!("Backend error: {msg}")));
         }
 
-        #[derive(serde::Deserialize)]
-        struct BackendResp {
-            data: Option<PhotoUploadResponse>,
-        }
-
-        let parsed: BackendResp = resp
+        let parsed: ApiResp<PhotoUploadResponse> = resp
             .json()
             .await
             .map_err(|e| ServerFnError::new(e.to_string()))?;

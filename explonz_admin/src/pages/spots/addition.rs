@@ -11,7 +11,9 @@ use crate::components::ui::button::{Button, ButtonVariant};
 use crate::components::ui::card::{Card, CardContent, CardHeader, CardTitle};
 use crate::components::ui::input::{Input, InputType};
 use crate::components::ui::label::Label;
+use crate::server::labels::get_labels;
 use crate::server::spots::{geocode_location, CreateSpot};
+use explonz_shared::icons::LabelIcon;
 
 // [UNCHANGED]
 const TEXTAREA_CLASS: &str = "text-foreground placeholder:text-muted-foreground border-input \
@@ -116,12 +118,55 @@ fn process_files(
 }
 
 // ───────────────────────────────────────────────────────────────
+// label 图标静态分发（与 labels/list.rs 保持一致）
+fn render_icon(name: LabelIcon) -> AnyView {
+    match name {
+        LabelIcon::Tag => view! { <icons::Tag /> }.into_any(),
+        LabelIcon::Users => view! { <icons::Users /> }.into_any(),
+        LabelIcon::Star => view! { <icons::Star /> }.into_any(),
+        LabelIcon::MapPin => view! { <icons::MapPin /> }.into_any(),
+        LabelIcon::Flame => view! { <icons::Flame /> }.into_any(),
+        LabelIcon::Coffee => view! { <icons::Coffee /> }.into_any(),
+        LabelIcon::Camera => view! { <icons::Camera /> }.into_any(),
+        LabelIcon::Wifi => view! { <icons::Wifi /> }.into_any(),
+        LabelIcon::Clock => view! { <icons::Clock /> }.into_any(),
+        LabelIcon::Mountain => view! { <icons::Mountain /> }.into_any(),
+        LabelIcon::TreePine => view! { <icons::TreePine /> }.into_any(),
+        LabelIcon::Waves => view! { <icons::Waves /> }.into_any(),
+        LabelIcon::Baby => view! { <icons::Baby /> }.into_any(),
+        LabelIcon::PawPrint => view! { <icons::PawPrint /> }.into_any(),
+        LabelIcon::Bike => view! { <icons::Bike /> }.into_any(),
+        LabelIcon::Tent => view! { <icons::Tent /> }.into_any(),
+        LabelIcon::Sunset => view! { <icons::Sunset /> }.into_any(),
+        LabelIcon::Accessibility => view! { <icons::Accessibility /> }.into_any(),
+    }
+}
+
+// ───────────────────────────────────────────────────────────────
 
 #[component]
 pub fn SpotAddition() -> impl IntoView {
     let create_action = ServerAction::<CreateSpot>::new();
     let navigate = use_navigate();
     let navigate_cancel = navigate.clone();
+
+    // ── Labels ────────────────────────────────────────────────────
+    let label_fetch_trigger = RwSignal::new(false);
+    Effect::new(move |_| {
+        label_fetch_trigger.set(true);
+    });
+    let labels = Resource::new(
+        move || label_fetch_trigger.get(),
+        move |ready| async move {
+            if !ready {
+                return Ok(vec![]);
+            }
+            get_labels().await
+        },
+    );
+    let selected_label_ids: RwSignal<Vec<String>> = RwSignal::new(vec![]);
+    let show_dropdown = RwSignal::new(false);
+    let search_query: RwSignal<String> = RwSignal::new(String::new());
 
     // [CHANGED] was: next_id = RwSignal::new(1u32) + photo_rows: RwSignal<Vec<(u32, RwSignal<String>)>>
     // now: photos list with PhotoItem/PhotoStatus state machine
@@ -344,12 +389,12 @@ pub fn SpotAddition() -> impl IntoView {
                                         multiple=true
                                         class="hidden"
                                         node_ref=file_input_ref
-                                        on:change=move |e| {
+                                        on:change=move |_e| {
                                             // event_target::<HtmlInputElement> 仅 WASM 可用
                                             #[cfg(target_arch = "wasm32")]
                                             {
                                                 let input: web_sys::HtmlInputElement =
-                                                    event_target(&e);
+                                                    event_target(&_e);
                                                 if let Some(files) = input.files() {
                                                     process_files(files, next_id, photos);
                                                 }
@@ -487,15 +532,205 @@ pub fn SpotAddition() -> impl IntoView {
                             // end [CHANGED] Photos 区域
                             // ══════════════════════════════════════════════════
 
-                            // [UNCHANGED] Attributes JSON
+                            // Labels 多选下拉（带搜索，absolute 定位相对触发器容器）
                             <div class="grid gap-2">
-                                <Label html_for="attributes_json">"Attributes (JSON)"</Label>
-                                <p class="text-xs text-muted-foreground">
-                                    r#"JSON array, e.g. [{"type":"family_friendly","label":"Family Friendly"}]"#
-                                </p>
-                                <textarea id="attributes_json" name="attributes_json" rows="3"
-                                    placeholder=r#"[{"type": "family_friendly", "label": "Family Friendly"}]"#
-                                    class=TEXTAREA_CLASS />
+                                <Label>"Labels"</Label>
+
+                                    // 相对定位容器：触发器 + 下拉面板都在此内
+                                    <div class="relative">
+                                    // 触发按钮：显示已选 label chips
+                                    <div
+                                        class="flex min-h-10 w-full cursor-pointer \
+                                               flex-wrap items-center gap-1.5 rounded-md border \
+                                               border-input bg-background px-3 py-2 text-sm \
+                                               transition-colors hover:bg-muted/30"
+                                        on:click=move |_| {
+                                            show_dropdown.update(|v| *v = !*v);
+                                        }
+                                    >
+                                        {move || {
+                                            let label_list = labels.get()
+                                                .and_then(|r| r.ok())
+                                                .unwrap_or_default();
+                                            let selected = selected_label_ids.get();
+                                            if selected.is_empty() {
+                                                return view! {
+                                                    <span class="flex-1 text-muted-foreground">
+                                                        "Select labels..."
+                                                    </span>
+                                                }.into_any();
+                                            }
+                                            view! {
+                                                <div class="flex flex-1 flex-wrap gap-1">
+                                                    {selected.into_iter().map(|id| {
+                                                        let id_remove = id.clone();
+                                                        let name = label_list.iter()
+                                                            .find(|l| l.id.to_string() == id)
+                                                            .map(|l| l.name.clone())
+                                                            .unwrap_or_default();
+                                                        view! {
+                                                            <span class="flex items-center gap-1 rounded \
+                                                                         bg-primary/10 px-1.5 py-0.5 \
+                                                                         text-xs text-primary">
+                                                                {name}
+                                                                <button
+                                                                    type="button"
+                                                                    class="leading-none hover:text-destructive"
+                                                                    on:click=move |e| {
+                                                                        e.stop_propagation();
+                                                                        selected_label_ids.update(|ids| {
+                                                                            ids.retain(|i| i != &id_remove);
+                                                                        });
+                                                                    }
+                                                                >"×"</button>
+                                                            </span>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            }.into_any()
+                                        }}
+                                        <span class="ml-auto shrink-0 text-xs text-muted-foreground">
+                                            {move || if show_dropdown.get() { "▲" } else { "▼" }}
+                                        </span>
+                                    </div>
+
+                                    // 遮罩 + 下拉面板
+                                    <Show when=move || show_dropdown.get()>
+                                        // 透明遮罩（fixed 全屏），捕获外部点击关闭下拉
+                                        <div
+                                            class="fixed inset-0 z-40"
+                                            on:click=move |_| {
+                                                show_dropdown.set(false);
+                                                search_query.set(String::new());
+                                            }
+                                        />
+                                        // 面板：absolute，紧贴触发器下方，宽度同触发器
+                                        <div
+                                            class="absolute top-full left-0 right-0 z-50 mt-1 \
+                                                   overflow-hidden rounded-md border \
+                                                   bg-background shadow-lg"
+                                            // 阻止点击冒泡到遮罩，避免面板内操作关闭下拉
+                                            on:click=move |e| e.stop_propagation()
+                                        >
+                                            // 搜索框
+                                            <div class="border-b p-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search labels..."
+                                                    class="w-full rounded border border-input \
+                                                           bg-transparent px-2 py-1.5 text-sm \
+                                                           outline-none focus:border-ring"
+                                                    prop:value=move || search_query.get()
+                                                    on:input=move |e| search_query.set(event_target_value(&e))
+                                                />
+                                            </div>
+                                            // label 列表（按搜索词过滤）
+                                            <div class="max-h-52 overflow-y-auto">
+                                                {move || {
+                                                    let query = search_query.get().to_lowercase();
+                                                    let label_list = labels.get()
+                                                        .and_then(|r| r.ok())
+                                                        .unwrap_or_default();
+                                                    let filtered: Vec<_> = label_list.into_iter()
+                                                        .filter(|l| {
+                                                            query.is_empty()
+                                                                || l.name.to_lowercase().contains(&query)
+                                                                || l.name.to_lowercase().contains(&query)
+                                                        })
+                                                        .collect();
+                                                    if filtered.is_empty() {
+                                                        return view! {
+                                                            <p class="px-3 py-4 text-center text-sm \
+                                                                       text-muted-foreground">
+                                                                "No labels found."
+                                                            </p>
+                                                        }.into_any();
+                                                    }
+                                                    view! {
+                                                        <div>
+                                                            {filtered.into_iter().map(|label| {
+                                                                let label_id  = label.id.to_string();
+                                                                let id_class  = label_id.clone();
+                                                                let id_check  = label_id.clone();
+                                                                let id_toggle = label_id.clone();
+                                                                let icon: LabelIcon = label.icon.parse()
+                                                                    .unwrap_or(LabelIcon::Tag);
+                                                                let display = label.name.clone();
+                                                                view! {
+                                                                    <button
+                                                                        type="button"
+                                                                        class="flex w-full cursor-pointer \
+                                                                               items-center gap-2 px-3 py-2 \
+                                                                               text-left text-sm transition-colors \
+                                                                               hover:bg-muted"
+                                                                        on:click=move |_| {
+                                                                            selected_label_ids.update(|ids| {
+                                                                                if let Some(pos) = ids.iter()
+                                                                                    .position(|id| id == &id_toggle)
+                                                                                {
+                                                                                    ids.remove(pos);
+                                                                                } else {
+                                                                                    ids.push(id_toggle.clone());
+                                                                                }
+                                                                            });
+                                                                        }
+                                                                    >
+                                                                        // 复选框
+                                                                        <span class=move || {
+                                                                            if selected_label_ids.get()
+                                                                                .contains(&id_class)
+                                                                            {
+                                                                                "flex size-4 shrink-0 items-center \
+                                                                                 justify-center rounded border-2 \
+                                                                                 border-primary bg-primary"
+                                                                            } else {
+                                                                                "flex size-4 shrink-0 items-center \
+                                                                                 justify-center rounded border-2 \
+                                                                                 border-input"
+                                                                            }
+                                                                        }>
+                                                                            <Show when=move || {
+                                                                                selected_label_ids.get()
+                                                                                    .contains(&id_check)
+                                                                            }>
+                                                                                <svg
+                                                                                    class="size-2.5 \
+                                                                                           text-primary-foreground"
+                                                                                    viewBox="0 0 12 12"
+                                                                                    fill="none"
+                                                                                >
+                                                                                    <path
+                                                                                        d="M2 6l3 3 5-5"
+                                                                                        stroke="currentColor"
+                                                                                        stroke-width="1.5"
+                                                                                        stroke-linecap="round"
+                                                                                        stroke-linejoin="round"
+                                                                                    />
+                                                                                </svg>
+                                                                            </Show>
+                                                                        </span>
+                                                                        // 图标
+                                                                        <span class="flex size-4 shrink-0 \
+                                                                                     items-center justify-center \
+                                                                                     text-muted-foreground">
+                                                                            {render_icon(icon)}
+                                                                        </span>
+                                                                        {display}
+                                                                    </button>
+                                                                }
+                                                            }).collect_view()}
+                                                        </div>
+                                                    }.into_any()
+                                                }}
+                                            </div>
+                                        </div>
+                                    </Show>
+                                    </div> // end relative wrapper
+
+                                // 每个选中 ID 对应一个隐藏字段，随 ActionForm 提交
+                                {move || selected_label_ids.get().into_iter().map(|id| {
+                                    view! { <input type="hidden" name="label_ids" value=id /> }
+                                }).collect_view()}
                             </div>
 
                             // [UNCHANGED] Phone & Website

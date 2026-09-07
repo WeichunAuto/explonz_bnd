@@ -35,7 +35,6 @@ fn render_icon(name: LabelIcon) -> AnyView {
         LabelIcon::Tent => view! { <icons::Tent /> }.into_any(),
         LabelIcon::Sunset => view! { <icons::Sunset /> }.into_any(),
         LabelIcon::Accessibility => view! { <icons::Accessibility /> }.into_any(),
-        _ => view! { <Tag /> }.into_any(), // 默认 Tag
     }
 }
 

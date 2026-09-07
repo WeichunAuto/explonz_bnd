@@ -24,7 +24,7 @@ pub async fn create_spot(
     longitude: f64,
     description: String,
     photo_urls: Vec<String>, // 多个同名 input 直接反序列化为 Vec
-    attributes_json: String,
+    label_ids: Vec<String>,  // 选中的 label ID 列表，多个同名 hidden input
     phone: Option<String>,
     website: Option<String>,
     opening_hours_json: String, // 7天营业时间，JSON 序列化后传入。 // 由 UI 隐藏字段自动维护，见 addition.rs
@@ -45,15 +45,7 @@ pub async fn create_spot(
         .filter(|s| !s.trim().is_empty())
         .collect();
 
-    // 3. 解析 attributes JSON，为空时默认 []
-    let attributes: serde_json::Value = if attributes_json.trim().is_empty() {
-        serde_json::Value::Array(vec![])
-    } else {
-        serde_json::from_str(&attributes_json)
-            .map_err(|e| ServerFnError::new(format!("Invalid JSON: {e}")))?
-    };
-
-    // 4. 解析 opening_hours JSON，为空时默认 []
+    // 3. 解析 opening_hours JSON，为空时默认 []
     let opening_hours: serde_json::Value = if opening_hours_json.trim().is_empty() {
         serde_json::Value::Array(vec![])
     } else {
@@ -69,11 +61,13 @@ pub async fn create_spot(
         "longitude": longitude,
         "description": description,
         "photo_urls": photo_urls,
-        "attributes": attributes,
+        "label_ids": label_ids,
         "phone": phone,
         "website": website,
         "opening_hours": opening_hours,
     });
+
+    println!("spot body: {}", body);
 
     // 5. 转发请求到后端（携带 Bearer token）
     let backend_url = crate::server::backend_url();

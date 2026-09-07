@@ -6,37 +6,10 @@ use crate::components::ui::button::{Button, ButtonSize, ButtonVariant};
 use crate::components::ui::card::{Card, CardContent};
 use crate::components::ui::input::{Input, InputType};
 use crate::components::ui::label::Label;
+use crate::components::ui::label_icon::LabelIconView;
 use crate::server::labels::{get_labels, CreateLabel, DeleteLabel, UpdateLabel};
 use explonz_shared::icons::LabelIcon;
 use strum::IntoEnumIterator;
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// 图标渲染分发（icons crate 组件无法在运行时动态构造，故用 match 静态分发）
-// ---------------------------------------------------------------------------
-
-fn render_icon(name: LabelIcon) -> AnyView {
-    match name {
-        LabelIcon::Tag => view! { <icons::Tag /> }.into_any(),
-        LabelIcon::Users => view! { <icons::Users /> }.into_any(),
-        LabelIcon::Star => view! { <icons::Star /> }.into_any(),
-        LabelIcon::MapPin => view! { <icons::MapPin /> }.into_any(),
-        LabelIcon::Flame => view! { <icons::Flame /> }.into_any(),
-        LabelIcon::Coffee => view! { <icons::Coffee /> }.into_any(),
-        LabelIcon::Camera => view! { <icons::Camera /> }.into_any(),
-        LabelIcon::Wifi => view! { <icons::Wifi /> }.into_any(),
-        LabelIcon::Clock => view! { <icons::Clock /> }.into_any(),
-        LabelIcon::Mountain => view! { <icons::Mountain /> }.into_any(),
-        LabelIcon::TreePine => view! { <icons::TreePine /> }.into_any(),
-        LabelIcon::Waves => view! { <icons::Waves /> }.into_any(),
-        LabelIcon::Baby => view! { <icons::Baby /> }.into_any(),
-        LabelIcon::PawPrint => view! { <icons::PawPrint /> }.into_any(),
-        LabelIcon::Bike => view! { <icons::Bike /> }.into_any(),
-        LabelIcon::Tent => view! { <icons::Tent /> }.into_any(),
-        LabelIcon::Sunset => view! { <icons::Sunset /> }.into_any(),
-        LabelIcon::Accessibility => view! { <icons::Accessibility /> }.into_any(),
-    }
-}
 
 // ---------------------------------------------------------------------------
 // 页面组件
@@ -206,7 +179,7 @@ pub fn LabelList() -> impl IntoView {
                                 on:click=move |_| show_icon_picker.update(|v| *v = !*v)
                             >
                                 <span class="size-4 flex items-center justify-center text-foreground">
-                                    {move || render_icon(form_icon.get())}
+                                    {move || view! { <LabelIconView icon=form_icon.get() /> }}
                                 </span>
                                 <span class="flex-1">{move || form_icon.get().to_string()}</span>
                                 // <span class="flex-1">"T"</span>
@@ -240,7 +213,7 @@ pub fn LabelList() -> impl IntoView {
                                                 }
                                             >
                                                 <span class="size-4 flex items-center justify-center">
-                                                    {render_icon(icon)}
+                                                    <LabelIconView icon=icon />
                                                 </span>
                                                 <span class="text-[10px] truncate w-full text-center leading-none">
                                                     {icon.to_string()}
@@ -392,7 +365,7 @@ pub fn LabelList() -> impl IntoView {
                                                     <td class="px-4 py-3">
                                                         <span class="size-5 flex items-center \
                                                                      text-muted-foreground">
-                                                            {render_icon(icon_name.parse().unwrap())}
+                                                            <LabelIconView icon=icon_name.parse().unwrap() />
                                                         </span>
                                                     </td>
 

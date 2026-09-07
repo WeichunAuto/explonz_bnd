@@ -11,6 +11,7 @@ use crate::components::ui::button::{Button, ButtonVariant};
 use crate::components::ui::card::{Card, CardContent, CardHeader, CardTitle};
 use crate::components::ui::input::{Input, InputType};
 use crate::components::ui::label::Label;
+use crate::components::ui::label_icon::LabelIconView;
 use crate::server::labels::get_labels;
 use crate::server::spots::{geocode_location, CreateSpot};
 use explonz_shared::icons::LabelIcon;
@@ -114,31 +115,6 @@ fn process_files(
             // now: photos 参数移除（upload_file 只更新 status，删除由外部 photos signal 处理）
             upload_file(file, status);
         }
-    }
-}
-
-// ───────────────────────────────────────────────────────────────
-// label 图标静态分发（与 labels/list.rs 保持一致）
-fn render_icon(name: LabelIcon) -> AnyView {
-    match name {
-        LabelIcon::Tag => view! { <icons::Tag /> }.into_any(),
-        LabelIcon::Users => view! { <icons::Users /> }.into_any(),
-        LabelIcon::Star => view! { <icons::Star /> }.into_any(),
-        LabelIcon::MapPin => view! { <icons::MapPin /> }.into_any(),
-        LabelIcon::Flame => view! { <icons::Flame /> }.into_any(),
-        LabelIcon::Coffee => view! { <icons::Coffee /> }.into_any(),
-        LabelIcon::Camera => view! { <icons::Camera /> }.into_any(),
-        LabelIcon::Wifi => view! { <icons::Wifi /> }.into_any(),
-        LabelIcon::Clock => view! { <icons::Clock /> }.into_any(),
-        LabelIcon::Mountain => view! { <icons::Mountain /> }.into_any(),
-        LabelIcon::TreePine => view! { <icons::TreePine /> }.into_any(),
-        LabelIcon::Waves => view! { <icons::Waves /> }.into_any(),
-        LabelIcon::Baby => view! { <icons::Baby /> }.into_any(),
-        LabelIcon::PawPrint => view! { <icons::PawPrint /> }.into_any(),
-        LabelIcon::Bike => view! { <icons::Bike /> }.into_any(),
-        LabelIcon::Tent => view! { <icons::Tent /> }.into_any(),
-        LabelIcon::Sunset => view! { <icons::Sunset /> }.into_any(),
-        LabelIcon::Accessibility => view! { <icons::Accessibility /> }.into_any(),
     }
 }
 
@@ -713,7 +689,7 @@ pub fn SpotAddition() -> impl IntoView {
                                                                         <span class="flex size-4 shrink-0 \
                                                                                      items-center justify-center \
                                                                                      text-muted-foreground">
-                                                                            {render_icon(icon)}
+                                                                            <LabelIconView icon=icon />
                                                                         </span>
                                                                         {display}
                                                                     </button>

@@ -8,3 +8,4 @@ pub mod sidenav;
 pub mod dropdown_menu;
 pub mod separator;
 pub mod breadcrumb;
+pub mod label_icon;

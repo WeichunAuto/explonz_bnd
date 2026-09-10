@@ -42,7 +42,7 @@ pub struct SpotDto {
     pub longitude: f64,
     pub description: String,
     pub photo_urls: Vec<String>,
-    pub attributes: Value,
+    // pub attributes: Value,
     pub created_at: DateTime<FixedOffset>,
     pub updated_at: DateTime<FixedOffset>,
 
@@ -96,7 +96,7 @@ impl From<crate::entity::spots::Model> for SpotDto {
             longitude: m.longitude,
             description: m.description,
             photo_urls: m.photo_urls,
-            attributes: m.attributes,
+            // attributes: m.attributes,
             created_at: m.created_at.into(),
             updated_at: m.updated_at.into(),
             phone: m.phone,

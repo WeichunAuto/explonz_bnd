@@ -5,16 +5,34 @@ use axum::{
     extract::{ConnectInfo, Multipart, State},
     Json,
 };
-use explonz_shared::common::{dto::SpotDto, utils::dir_into_url_path};
+use explonz_shared::common::{
+    dto::SpotDto,
+    pagination::{Page, Pagination},
+    utils::dir_into_url_path,
+};
+use serde::Deserialize;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
     api::spots::dto::{CreateSpotRequest, ImageUploadResponse},
     application::AppState,
     error::ApiError,
+    request::BValidQuery,
     response::{ApiResponse, ApiResult},
-    service::spots::create_spot_service,
+    service::spots::{create_spot_service, get_spots_service},
 };
+
+// Spot 查询条的件参数
+#[derive(Debug, Deserialize, Validate)]
+pub struct SpotQuery {
+    pub id: Option<Uuid>,
+    pub name: Option<String>,
+    #[validate(nested)]
+    #[serde(flatten)]
+    // Flatten the nested Pagination struct fields into the current struct to avoid nested levels in JSON.
+    pub pagination: Option<Pagination>,
+}
 
 #[debug_handler]
 #[tracing::instrument(name = "create_spot", skip_all, fields(IP = %addr))]
@@ -33,6 +51,17 @@ pub async fn create_spot(
         .map_err(|e| ApiError::InternalError(e))?;
 
     Ok(ApiResponse::success("spot created", Some(spot)))
+}
+
+// 获取所有分页 Spots
+#[debug_handler]
+#[tracing::instrument(name = "get_spots", skip_all)]
+pub async fn get_spots(
+    State(AppState { db, .. }): State<AppState>,
+    BValidQuery(spot_params): BValidQuery<SpotQuery>,
+) -> ApiResult<Page<SpotDto>> {
+    let spots_with_page = get_spots_service(&db, spot_params).await;
+    Ok(ApiResponse::success("ok", Some(spots_with_page)))
 }
 
 #[debug_handler]

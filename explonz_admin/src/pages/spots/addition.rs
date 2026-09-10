@@ -125,6 +125,7 @@ pub fn SpotAddition() -> impl IntoView {
     let create_action = ServerAction::<CreateSpot>::new();
     let navigate = use_navigate();
     let navigate_cancel = navigate.clone();
+    let location = leptos_router::hooks::use_location();
 
     // ── Labels ────────────────────────────────────────────────────
     let label_fetch_trigger = RwSignal::new(false);
@@ -225,10 +226,17 @@ pub fn SpotAddition() -> impl IntoView {
         serde_json::to_string(&entries).unwrap_or_default()
     });
 
-    // [UNCHANGED] 提交成功后跳转
+    // 提交成功后跳转到同级的 spot_list 页
+    // 取当前路径的父段（去掉最后一个 /xxx），拼上 /spot_list，
+    // 避免把路由前缀写死在组件里
     Effect::new(move |_| {
         if let Some(Ok(_)) = create_action.value().get() {
-            navigate("/spots", NavigateOptions::default());
+            let current = location.pathname.get_untracked();
+            let target = current
+                .rsplit_once('/')
+                .map(|(base, _)| format!("{}/spot_list", base))
+                .unwrap_or_else(|| "/spots".to_string());
+            navigate(&target, NavigateOptions::default());
         }
     });
 
@@ -812,7 +820,12 @@ pub fn SpotAddition() -> impl IntoView {
                                 <Button
                                     variant=ButtonVariant::Outline
                                     on:click=move |_| {
-                                        navigate_cancel("/spots", NavigateOptions::default());
+                                        let current = location.pathname.get_untracked();
+                                        let target = current
+                                            .rsplit_once('/')
+                                            .map(|(base, _)| format!("{}/spot_list", base))
+                                            .unwrap_or_else(|| "/spots".to_string());
+                                        navigate_cancel(&target, NavigateOptions::default());
                                     }
                                 >
                                     "Cancel"

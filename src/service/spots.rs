@@ -1,9 +1,11 @@
 use explonz_shared::common::dto::SpotDto;
-use sea_orm::ActiveModelTrait;
+use explonz_shared::common::pagination::{Page, Pagination};
+use sea_orm::{ActiveModelTrait, ColumnTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, TransactionTrait};
 use uuid::Uuid;
 
 use crate::api::spots::dto::CreateSpotRequest;
+use crate::api::spots::handler::SpotQuery;
 use explonz_shared::entity::{prelude::*, spot_label_assignments, spot_opening_hours, spots};
 
 pub async fn create_spot_service(
@@ -83,10 +85,64 @@ pub async fn create_spot_service(
         longitude: result.longitude,
         description: result.description,
         photo_urls: result.photo_urls,
-        attributes: result.attributes,
         created_at: result.created_at.into(),
         updated_at: result.updated_at.into(),
         phone: result.phone,
         website: result.website,
     })
+}
+
+// 获取所有分页 Spots
+pub async fn get_spots_service(db: &DatabaseConnection, spot_params: SpotQuery) -> Page<SpotDto> {
+    // println!("进入 service....");
+    let mut query = Spots::find();
+    if let Some(spot_id) = spot_params.id {
+        query = query.filter(spots::Column::Id.eq(spot_id))
+    }
+    if let Some(spot_name) = spot_params.name {
+        query = query.filter(spots::Column::Name.contains(spot_name))
+    }
+    query = query.order_by_desc(spots::Column::CreatedAt);
+
+    let (pagination, items, total) = if let Some(pagination) = spot_params.pagination {
+        let pagination = Pagination {
+            page: pagination.page,
+            size: pagination.size,
+        };
+        let paginator = query.paginate(db, pagination.size);
+        let total = paginator.num_items().await.unwrap_or_else(|_| {
+            tracing::error!("error getting total");
+            0
+        });
+        let items = paginator
+            .fetch_page(pagination.page - 1)
+            .await
+            .unwrap_or_else(|_| {
+                tracing::error!("error getting total");
+                vec![]
+            });
+        (pagination, items, total)
+    } else {
+        let items = query.all(db).await.unwrap_or_else(|_| {
+            tracing::error!("error getting total");
+            vec![]
+        });
+        let total = items.len() as u64;
+        let pagination = Pagination {
+            page: 1,
+            size: total,
+        };
+        (pagination, items, total)
+    };
+
+    let spots: Vec<SpotDto> = items
+        .iter()
+        .map(|spot_model| {
+            SpotDto::from(spot_model.clone())
+        })
+        .collect();
+
+    tracing::info!("spots all : {:?}", spots);
+
+    Page::from_pagination(&pagination, total, spots)
 }

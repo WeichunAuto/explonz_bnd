@@ -2,20 +2,6 @@ use crate::server::ApiResp;
 use explonz_shared::common::dto::SpotDto;
 use leptos::prelude::*;
 
-#[server(GetSpots, "/api")]
-pub async fn get_spots(page: u64, page_size: u64) -> Result<Vec<SpotDto>, ServerFnError> {
-    use explonz_shared::entity::spots;
-    use sea_orm::{DatabaseConnection, EntityTrait};
-
-    let db = use_context::<DatabaseConnection>()
-        .ok_or_else(|| ServerFnError::new("No DB connection"))?;
-    let models = spots::Entity::find()
-        .all(&db)
-        .await
-        .map_err(|e| ServerFnError::new(e))?;
-    Ok(models.into_iter().map(SpotDto::from).collect())
-}
-
 // 创建一个Spot
 #[server(CreateSpot, "/api")]
 pub async fn create_spot(
@@ -91,6 +77,36 @@ pub async fn create_spot(
     }
 
     let parsed: BackendResponse = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
+}
+
+// 获取 Spot
+#[server(GetSpots, "/api")]
+pub async fn get_spots(page: u64, page_size: u64) -> Result<Vec<SpotDto>, ServerFnError> {
+    println!("jinru.....");
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .get(format!("{backend_url}/api/spots"))
+        .query(&[("page", page), ("page_size", page_size)])
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<Vec<SpotDto>> = resp
         .json()
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?;

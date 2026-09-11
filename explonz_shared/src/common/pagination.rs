@@ -33,7 +33,7 @@ pub struct Pagination {
 /// Paginated response wrapper
 /// # Type Parameters
 /// - `T`: The type of items in the data collection
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Page<T> {
     /// Collection of items for the current page
     pub data: Vec<T>,

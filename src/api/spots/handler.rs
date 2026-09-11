@@ -30,8 +30,7 @@ pub struct SpotQuery {
     pub name: Option<String>,
     #[validate(nested)]
     #[serde(flatten)]
-    // Flatten the nested Pagination struct fields into the current struct to avoid nested levels in JSON.
-    pub pagination: Option<Pagination>,
+    pub pagination: Pagination,
 }
 
 #[debug_handler]
@@ -75,7 +74,7 @@ pub async fn upload_image(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     mut multipart: Multipart,
 ) -> ApiResult<ImageUploadResponse> {
-    tracing::info!("开始上传图片...");
+    // tracing::info!("开始上传图片...");
     let upload_dir = format!("{}/spots/images", upload_dir);
 
     // 防止目录不存在

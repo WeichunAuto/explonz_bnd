@@ -12,9 +12,27 @@ use validator::ValidationError;
 ///
 /// Wraps Axum's built-in Query extractor with custom error handling.
 /// Provides a consistent API error type for query parameter extraction failures.
-#[derive(Debug, Clone, Copy, Default, FromRequestParts)]
-#[from_request(via(axum::extract::Query), rejection(ApiError))]
+// #[derive(Debug, Clone, Copy, Default, FromRequestParts)]
+// #[from_request(via(axum::extract::Query), rejection(ApiError))]
+// pub struct BQuery<T>(pub T);
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct BQuery<T>(pub T);
+
+impl<S, T> FromRequestParts<S> for BQuery<T>
+where
+    S: Send + Sync,
+    T: serde::de::DeserializeOwned,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let query_str = parts.uri.query().unwrap_or("");
+        let value =
+            serde_qs::from_str::<T>(query_str).map_err(|e| ApiError::BizError(e.to_string()))?;
+        Ok(BQuery(value))
+    }
+}
 
 /// Custom Path extractor wrapper
 #[derive(Debug, Clone, Copy, Default, FromRequestParts)]

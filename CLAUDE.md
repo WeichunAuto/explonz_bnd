@@ -444,6 +444,55 @@ AI 可以检查现有 Entity，并根据 Entity 的实际定义修改业务代�
 
 ---
 
+## Leptos 0.8 Suspense 传播规则（已验证）
+
+### 核心机制
+
+在 Leptos 0.8 中，当一个 `Resource` 处于 pending 状态时，其 pending 会注册到当前**响应式调用栈中最近的 `SuspenseContext`**。`SuspenseContext` 的查找方式是沿着 **owner chain** 向上追溯，而不仅仅是 DOM 嵌套层级。
+
+### 关键结论
+
+1. **`Effect` 不隔离 SuspenseContext**：`Effect::new` 在组件函数体中创建，其 owner chain 继承了创建时的 SuspenseContext 链。若 Effect 内调用 `resource.get()` 且 Resource 处于 pending，会沿 owner chain 传播到最近的 `SuspenseContext`，触发其 fallback（含 AuthGuard 全屏 load）。
+
+2. **`<Suspense>` 是有效边界**：在 `<Suspense>` 的 view 闭包（`{move || ...}`）内读取 Resource，Leptos 将 pending 注册到该 `<Suspense>` 的 SuspenseContext，**不会冒泡**到上层（如 AuthGuard）。
+
+### 正确模式：Resource 只在 `<Suspense>` view 内读取
+
+```rust
+// ✅ 正确：spots_page 只在 <Suspense> view 闭包内读取
+// pending 被本地 Suspense 拦截，AuthGuard 不感知
+<Suspense fallback=|| view! { <div>"Loading..."</div> }>
+    {move || {
+        let Some(Ok(page)) = spots_page.get() else { return view!{<div/>}.into_any() };
+        // 可在此处更新分页 signal（副作用写入，无需额外 Effect）
+        total_items.set(page.total);
+        // ... 渲染 table
+    }}
+</Suspense>
+
+// ❌ 错误：在 Effect 中读取 Resource（即使有本地 <Suspense> 也无效）
+Effect::new(move |_| {
+    if let Some(Ok(ref p)) = spots_page.get() {  // 会传播到 AuthGuard！
+        total_items.set(p.total);
+    }
+});
+```
+### 导航组件规则
+
+Leptos Admin 中使用 `<A>` 组件（`leptos_router::components::A`）做客户端路由跳转，非标准 HTML 属性需加 `attr:` 前缀：
+
+```rust
+// ✅ 正确
+<A href=href attr:class=class attr:data-name="SidenavLink">
+    {children()}
+</A>
+
+// ❌ 错误：plain <a> 会触发全页面刷新（SSR reload）
+<a href=href>{children()}</a>
+```
+
+---
+
 ## 图片上传流程
 
 ```

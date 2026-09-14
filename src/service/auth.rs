@@ -21,13 +21,13 @@ use crate::entity::sea_orm_active_enums::AuthProviderType;
 use crate::entity::{prelude::*, users};
 use crate::entity::{sign_up_otps, user_auth_providers};
 use crate::error::ApiError;
-use explonz_shared::common::auth::{get_jwt, Principal};
 use crate::response::{ApiResponse, ApiResult};
 use crate::service::email::VerifyEmailTemplate;
 use crate::{
     api::auth::dto::{LoginResponse, LoginUser},
     entity::refresh_tokens,
 };
+use explonz_shared::common::auth::{get_jwt, Principal};
 
 use chrono::DateTime;
 use sea_orm::sqlx::types::chrono;

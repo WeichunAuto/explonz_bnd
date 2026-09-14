@@ -13,10 +13,8 @@ pub async fn get_spots(
     let token = crate::server::extract_token().await?;
     let backend_url = crate::server::backend_url();
 
-    let mut params: Vec<(&str, String)> = vec![
-        ("page", page.to_string()),
-        ("size", size.to_string()),
-    ];
+    let mut params: Vec<(&str, String)> =
+        vec![("page", page.to_string()), ("size", size.to_string())];
     if let Some(id_val) = id {
         params.push(("id", id_val));
     }
@@ -42,7 +40,35 @@ pub async fn get_spots(
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?;
 
-    parsed.data.ok_or_else(|| ServerFnError::new("No data returned"))
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
+}
+
+// 获取单个 Spot 详情
+#[server(GetSpot, "/api")]
+pub async fn get_spot(spot_id: String) -> Result<SpotDto, ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .get(format!("{backend_url}/api/spots/{spot_id}"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<SpotDto> = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed.data.ok_or_else(|| ServerFnError::new("Not found"))
 }
 
 // 删除 Spot
@@ -149,7 +175,6 @@ pub async fn create_spot(
         .data
         .ok_or_else(|| ServerFnError::new("No data returned"))
 }
-
 
 #[server(GeocodeLocation, "/api")]
 pub async fn geocode_location(address: String) -> Result<(f64, f64), ServerFnError> {

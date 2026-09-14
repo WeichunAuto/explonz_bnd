@@ -18,9 +18,9 @@ use crate::{
     api::spots::dto::{CreateSpotRequest, ImageUploadResponse},
     application::AppState,
     error::ApiError,
-    request::BValidQuery,
+    request::{BPath, BValidQuery},
     response::{ApiResponse, ApiResult},
-    service::spots::{create_spot_service, get_spots_service},
+    service::spots::{create_spot_service, get_spot_service, get_spots_service},
 };
 
 // Spot 查询条的件参数
@@ -61,6 +61,20 @@ pub async fn get_spots(
 ) -> ApiResult<Page<SpotDto>> {
     let spots_with_page = get_spots_service(&db, spot_params).await;
     Ok(ApiResponse::success("ok", Some(spots_with_page)))
+}
+
+// 获取某个 Spot
+#[debug_handler]
+#[tracing::instrument(name = "get_spot", skip_all)]
+pub async fn get_spot(
+    State(AppState { db, .. }): State<AppState>,
+    BPath(spot_id): BPath<Uuid>,
+) -> ApiResult<SpotDto> {
+    let spot = get_spot_service(&db, spot_id)
+        .await
+        .map_err(ApiError::InternalError)?
+        .ok_or(ApiError::NotFoundError)?;
+    Ok(ApiResponse::success("ok", Some(spot)))
 }
 
 #[debug_handler]

@@ -1,12 +1,14 @@
-use explonz_shared::common::dto::SpotDto;
-use explonz_shared::common::pagination::{Page, Pagination};
-use sea_orm::{ActiveModelTrait, ColumnTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use std::collections::HashMap;
+
+use explonz_shared::common::dto::{LabelDto, OpeningHourDto, SpotDto};
+use explonz_shared::common::pagination::Page;
+use sea_orm::{ActiveModelTrait, ColumnTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, TransactionTrait};
 use uuid::Uuid;
 
 use crate::api::spots::dto::CreateSpotRequest;
 use crate::api::spots::handler::SpotQuery;
-use explonz_shared::entity::{prelude::*, spot_label_assignments, spot_opening_hours, spots};
+use explonz_shared::entity::{prelude::*, spot_label_assignments, spot_labels, spot_opening_hours, spots};
 
 pub async fn create_spot_service(
     db: &DatabaseConnection,
@@ -89,10 +91,12 @@ pub async fn create_spot_service(
         updated_at: result.updated_at.into(),
         phone: result.phone,
         website: result.website,
+        labels: vec![],
+        opening_hours: vec![],
     })
 }
 
-// 获取所有分页 Spots
+// 获取所有分页 Spots（含 labels + opening_hours）
 pub async fn get_spots_service(db: &DatabaseConnection, spot_params: SpotQuery) -> Page<SpotDto> {
     let mut query = Spots::find();
     if let Some(spot_id) = spot_params.id {
@@ -113,16 +117,93 @@ pub async fn get_spots_service(db: &DatabaseConnection, spot_params: SpotQuery) 
         .fetch_page(pagination.page - 1)
         .await
         .unwrap_or_else(|_| {
-        tracing::error!("error fetching paAQSge");
+            tracing::error!("error fetching page");
             vec![]
         });
 
+    let spot_ids: Vec<Uuid> = items.iter().map(|m| m.id).collect();
+
+    let (labels_map, hours_map) = if spot_ids.is_empty() {
+        (HashMap::new(), HashMap::new())
+    } else {
+        load_labels_and_hours(db, &spot_ids).await
+    };
+
     let spots: Vec<SpotDto> = items
-        .iter()
-        .map(|spot_model| SpotDto::from(spot_model.clone()))
+        .into_iter()
+        .map(|m| {
+            let id = m.id;
+            let mut dto = SpotDto::from(m);
+            dto.labels = labels_map.get(&id).cloned().unwrap_or_default();
+            dto.opening_hours = hours_map.get(&id).cloned().unwrap_or_default();
+            dto
+        })
         .collect();
 
-    // tracing::info!("spots all : {:?}", spots);
-
     Page::from_pagination(&pagination, total, spots)
+}
+
+// 根据 spot_id 获取某个 spot 详情（含 labels + opening_hours）
+pub async fn get_spot_service(
+    db: &DatabaseConnection,
+    spot_id: Uuid,
+) -> anyhow::Result<Option<SpotDto>> {
+    let model = Spots::find_by_id(spot_id).one(db).await?;
+    let Some(model) = model else {
+        return Ok(None);
+    };
+    let (mut labels_map, mut hours_map) = load_labels_and_hours(db, &[spot_id]).await;
+    let mut dto = SpotDto::from(model);
+    dto.labels = labels_map.remove(&spot_id).unwrap_or_default();
+    dto.opening_hours = hours_map.remove(&spot_id).unwrap_or_default();
+    Ok(Some(dto))
+}
+
+/// 批量加载 labels 和 opening_hours，返回两个 HashMap (spot_id -> Vec)
+async fn load_labels_and_hours(
+    db: &DatabaseConnection,
+    spot_ids: &[Uuid],
+) -> (HashMap<Uuid, Vec<LabelDto>>, HashMap<Uuid, Vec<OpeningHourDto>>) {
+    // 1. labels: spot_label_assignments JOIN spot_labels
+    let assignments: Vec<(spot_label_assignments::Model, Option<spot_labels::Model>)> =
+        SpotLabelAssignments::find()
+            .filter(spot_label_assignments::Column::SpotId.is_in(spot_ids.to_vec()))
+            .find_also_related(spot_labels::Entity)
+            .all(db)
+            .await
+            .unwrap_or_default();
+
+    let mut labels_map: HashMap<Uuid, Vec<LabelDto>> = HashMap::new();
+    for (assignment, label_opt) in assignments {
+        if let Some(label) = label_opt {
+            labels_map.entry(assignment.spot_id).or_default().push(LabelDto {
+                id: label.id,
+                name: label.name,
+                description: label.description,
+                icon: label.icon,
+            });
+        }
+    }
+
+    // 2. opening_hours
+    let all_hours: Vec<spot_opening_hours::Model> = SpotOpeningHours::find()
+        .filter(spot_opening_hours::Column::SpotId.is_in(spot_ids.to_vec()))
+        .order_by_asc(spot_opening_hours::Column::DayOfWeek)
+        .all(db)
+        .await
+        .unwrap_or_default();
+
+    let mut hours_map: HashMap<Uuid, Vec<OpeningHourDto>> = HashMap::new();
+    for h in all_hours {
+        let dto = OpeningHourDto {
+            day_of_week: h.day_of_week,
+            is_closed: h.is_closed,
+            is_open_24h: h.is_open_24h,
+            open_time: h.open_time.map(|t| t.format("%H:%M").to_string()),
+            close_time: h.close_time.map(|t| t.format("%H:%M").to_string()),
+        };
+        hours_map.entry(h.spot_id).or_default().push(dto);
+    }
+
+    (labels_map, hours_map)
 }

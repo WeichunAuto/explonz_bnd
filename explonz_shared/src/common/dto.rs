@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -48,6 +48,40 @@ pub struct SpotDto {
 
     pub phone: Option<String>,
     pub website: Option<String>,
+    pub labels: Vec<LabelDto>,
+    pub opening_hours: Vec<OpeningHourDto>,
+}
+
+impl Default for SpotDto {
+    fn default() -> Self {
+        let epoch = DateTime::<Utc>::UNIX_EPOCH.fixed_offset();
+        Self {
+            id: Uuid::nil(),
+            name: String::new(),
+            rating: Decimal::ZERO,
+            location: String::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            description: String::new(),
+            photo_urls: vec![],
+            created_at: epoch,
+            updated_at: epoch,
+            phone: None,
+            website: None,
+            labels: vec![],
+            opening_hours: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpeningHourDto {
+    pub day_of_week: i16,
+    pub is_closed: bool,
+    pub is_open_24h: bool,
+    pub open_time: Option<String>,
+    pub close_time: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +135,8 @@ impl From<crate::entity::spots::Model> for SpotDto {
             updated_at: m.updated_at.into(),
             phone: m.phone,
             website: m.website,
+            labels: vec![],
+            opening_hours: vec![],
         }
     }
 }

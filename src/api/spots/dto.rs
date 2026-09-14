@@ -18,6 +18,7 @@ pub struct CreateSpotRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpeningHourInput {
     pub day_of_week: i16, // 0=Sun … 6=Sat
     pub is_closed: bool,

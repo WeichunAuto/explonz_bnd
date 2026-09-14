@@ -4,7 +4,8 @@ use axum::{
 };
 
 use crate::{
-    api::labels::handler::{create_label, delete_label, get_labels, update_label}, application::AppState,
+    api::labels::handler::{create_label, delete_label, get_labels, update_label},
+    application::AppState,
 };
 
 pub mod dto;

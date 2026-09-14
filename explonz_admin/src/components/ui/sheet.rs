@@ -14,7 +14,7 @@ mod components {
     clx! {SheetTitle, h2, "font-bold text-2xl"}
     clx! {SheetDescription, p, "text-muted-foreground"}
     clx! {SheetBody, div, "flex flex-col gap-4"}
-    clx! {SheetFooter, footer, "mt-auto flex flex-col gap-2 p-4"}
+    clx! {SheetFooter, footer, "mt-auto flex flex-col justify-end gap-2 p-4"}
 }
 
 pub use components::*;
@@ -26,6 +26,9 @@ pub use components::*;
 #[derive(Clone)]
 pub struct SheetContext {
     pub target_id: String,
+    /// 首次打开后永久为 true，用于懒挂载 SheetContent 的 children。
+    /// 避免 children 中的 Resource 在 sheet 关闭时就创建，传播到 AuthGuard Suspense。
+    pub ever_opened: RwSignal<bool>,
 }
 
 /* ========================================================== */
@@ -38,7 +41,11 @@ pub type SheetSize = ButtonSize;
 #[component]
 pub fn Sheet(children: Children, #[prop(optional, into)] class: String) -> impl IntoView {
     let sheet_target_id = use_random_id_for("sheet");
-    let ctx = SheetContext { target_id: sheet_target_id };
+    let ever_opened = RwSignal::new(false);
+    let ctx = SheetContext {
+        target_id: sheet_target_id,
+        ever_opened,
+    };
 
     let merged_class = tw_merge!("", class);
 
@@ -60,9 +67,12 @@ pub fn SheetTrigger(
 ) -> impl IntoView {
     let ctx = expect_context::<SheetContext>();
     let trigger_id = format!("trigger_{}", ctx.target_id);
+    let ever_opened = ctx.ever_opened;
 
     view! {
-        <Button class=class attr:id=trigger_id attr:data-sheet-trigger=ctx.target_id variant=variant size=size>
+        <Button class=class attr:id=trigger_id attr:data-sheet-trigger=ctx.target_id variant=variant size=size
+            on:click=move |_| ever_opened.set(true)
+        >
             {children()}
         </Button>
     }
@@ -78,7 +88,7 @@ pub fn SheetClose(
     let ctx = expect_context::<SheetContext>();
 
     view! {
-        <Button class=class attr:data-sheet-close=ctx.target_id attr:aria-label="Close sheet" variant=variant size=size>
+        <Button class=class attr:r#type="button" attr:data-sheet-close=ctx.target_id attr:aria-label="Close sheet" variant=variant size=size>
             {children()}
         </Button>
     }
@@ -157,7 +167,7 @@ pub fn SheetContent(
 
                         const openSheet = () => {{
                             // Lock scrolling
-                            window.ScrollLock.lock();
+                            if (window.ScrollLock) window.ScrollLock.lock();
 
                             sheet.setAttribute('data-state', 'open');
                             backdrop.setAttribute('data-state', 'open');
@@ -185,7 +195,7 @@ pub fn SheetContent(
                             else if (direction === 'Bottom') sheet.classList.add('translate-y-full');
 
                             // Unlock scrolling after animation
-                            window.ScrollLock.unlock(300);
+                            if (window.ScrollLock) window.ScrollLock.unlock(300);
                         }};
 
                         // Open sheet when trigger is clicked

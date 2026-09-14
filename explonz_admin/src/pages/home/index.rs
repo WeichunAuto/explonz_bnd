@@ -185,15 +185,9 @@ pub fn Sidenav02MobileSheet(
 /* ========================================================== */
 
 // * A simple example with basic links.
-
 const SPOTS_LINKS: &[(&str, &str)] = &[
-    ("/admin/home/explonz/spots/addition", "Addition"),
-    ("/admin/home/explonz/spots/spot_list", "Spots List"),
-    ("/admin/home/explonz/spots/label_list", "Labels List"),
-    (
-        "/view/sidenav02/docs/components/alert-dialog",
-        "Alert Dialog",
-    ),
+    ("/admin/home/explonz/spots/spot_list", "Spots"),
+    ("/admin/home/explonz/spots/label_list", "Labels"),
     ("/view/sidenav02/docs/components/button", "Button"),
     ("/view/sidenav02/docs/components/card", "Card"),
     ("/view/sidenav02/docs/components/checkbox", "Checkbox"),

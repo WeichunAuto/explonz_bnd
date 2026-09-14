@@ -2,6 +2,7 @@ use leptos::ev;
 use leptos::prelude::*;
 use leptos::wasm_bindgen::JsCast;
 use leptos::web_sys::HtmlElement;
+use leptos_router::components::A;
 use leptos_router::hooks::use_location;
 use leptos_ui::{clx, variants, void};
 
@@ -86,8 +87,11 @@ pub fn SidenavWrapper(
 
         if let Some(element) = document().active_element() {
             let tag_name = element.tag_name();
-            let is_text_input = tag_name.eq_ignore_ascii_case("input") || tag_name.eq_ignore_ascii_case("textarea");
-            let is_content_editable = element.dyn_ref::<HtmlElement>().is_some_and(HtmlElement::is_content_editable);
+            let is_text_input =
+                tag_name.eq_ignore_ascii_case("input") || tag_name.eq_ignore_ascii_case("textarea");
+            let is_content_editable = element
+                .dyn_ref::<HtmlElement>()
+                .is_some_and(HtmlElement::is_content_editable);
 
             if is_text_input || is_content_editable {
                 return;
@@ -99,7 +103,10 @@ pub fn SidenavWrapper(
     });
     on_cleanup(move || listener.remove());
 
-    let merged_class = tw_merge!("group/sidenav-wrapper has-data-[variant=Inset]:bg-sidenav flex h-full w-full", class);
+    let merged_class = tw_merge!(
+        "group/sidenav-wrapper has-data-[variant=Inset]:bg-sidenav flex h-full w-full",
+        class
+    );
 
     view! {
         <div class=merged_class data-name="SidenavWrapper">
@@ -131,9 +138,9 @@ pub fn SidenavLink(
     let aria_current = move || if is_active() { "page" } else { "false" };
 
     view! {
-        <a data-name="SidenavLink" class=merged_class href=href aria-current=aria_current>
+        <A href=href attr:data-name="SidenavLink" attr:class=merged_class attr:aria-current=aria_current>
             {children()}
-        </a>
+        </A>
     }
 }
 
@@ -197,8 +204,9 @@ pub fn Sidenav(
 ) -> impl IntoView {
     let ctx = use_context::<SidenavContext>();
     // Context signal takes priority; falls back to static prop (JS can still mutate data-state directly)
-    let is_open: Signal<bool> =
-        ctx.map(|c| c.open.into()).unwrap_or_else(|| Signal::derive(move || data_state == SidenavState::Expanded));
+    let is_open: Signal<bool> = ctx
+        .map(|c| c.open.into())
+        .unwrap_or_else(|| Signal::derive(move || data_state == SidenavState::Expanded));
 
     view! {
         {if data_collapsible == SidenavCollapsible::None {

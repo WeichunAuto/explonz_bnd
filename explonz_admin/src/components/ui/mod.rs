@@ -1,12 +1,12 @@
 pub mod accordion;
+pub mod breadcrumb;
 pub mod button;
 pub mod card;
+pub mod dropdown_menu;
 pub mod input;
 pub mod label;
+pub mod label_icon;
+pub mod separator;
 pub mod sheet;
 pub mod sidenav;
-pub mod dropdown_menu;
-pub mod separator;
-pub mod breadcrumb;
-pub mod label_icon;
 pub mod table;

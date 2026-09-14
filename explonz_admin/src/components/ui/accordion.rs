@@ -22,7 +22,10 @@ pub use components::*;
 /* ========================================================== */
 
 #[component]
-pub fn AccordionContent(#[prop(into, optional)] class: String, children: Children) -> impl IntoView {
+pub fn AccordionContent(
+    #[prop(into, optional)] class: String,
+    children: Children,
+) -> impl IntoView {
     let merged_class = tw_merge!("p-3 pt-0", class);
 
     view! {

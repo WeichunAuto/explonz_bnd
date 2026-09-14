@@ -1,5 +1,5 @@
 use explonz_shared::common::{dto::SpotDto, pagination::Page};
-use icons::{Pencil, Plus, Trash2, X};
+use icons::{Trash2, X};
 use leptos::prelude::*;
 use leptos_router::hooks::{use_location, use_navigate};
 
@@ -8,7 +8,9 @@ use crate::components::ui::card::{Card, CardContent};
 use crate::components::ui::input::{Input, InputType};
 use crate::components::ui::label::Label;
 use crate::components::ui::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
-use crate::server::spots::{delete_spot, get_spots, DeleteSpot};
+use crate::pages::spots::addition::SpotAddition;
+use crate::pages::spots::detail::SpotDetail;
+use crate::server::spots::{get_spots, DeleteSpot};
 
 const PAGE_SIZE: u64 = 2;
 
@@ -27,7 +29,7 @@ pub fn SpotList() -> impl IntoView {
         }
     });
 
-    // 当前路由父路径（组件挂载时计算一次）
+    // 当前路由父路径（组件挂载时计算一次，编辑按钮跳转仍需要）
     let spots_base = {
         let current = location.pathname.get_untracked();
         current
@@ -75,21 +77,12 @@ pub fn SpotList() -> impl IntoView {
         },
     );
 
-    // ── 分页信息（信号，由 Resource 加载后更新，供分页控件响应式绑定）────
+    // ── 分页信息（信号，在 Suspense view 内由 Resource 数据更新）─────────
+    // 关键：不在任何 Effect/Memo 中读取 spots_page，否则 Effect 的 owner chain
+    // 继承了 AuthGuard 的 SuspenseContext，导致 pending 状态冒泡触发全屏 "load..."。
+    // 分页信号在 <Suspense> 内部的 view 闭包里作为副作用更新（与 LabelList 模式一致）。
     let total_items: RwSignal<u64> = RwSignal::new(0);
     let total_pages: RwSignal<u64> = RwSignal::new(1);
-
-    Effect::new(move |_| {
-        if let Some(Ok(ref p)) = spots_page.get() {
-            total_items.set(p.total);
-            let tp = if p.size == 0 {
-                1
-            } else {
-                ((p.total + p.size - 1) / p.size).max(1)
-            };
-            total_pages.set(tp);
-        }
-    });
 
     // ── 删除 ──────────────────────────────────────────────────────────────
     let deleting_id: RwSignal<Option<String>> = RwSignal::new(None);
@@ -133,16 +126,7 @@ pub fn SpotList() -> impl IntoView {
             // ── 页头 ──────────────────────────────────────────────────────
             <div class="flex items-center justify-between">
                 <h1 class="text-2xl font-bold tracking-tight">"Spots"</h1>
-                <Button
-                    variant=ButtonVariant::Default
-                    on:click={
-                        let bp = spots_base.clone();
-                        move |_| nav_target.set(Some(format!("{}/addition", bp)))
-                    }
-                >
-                    <Plus class="size-4" />
-                    "New Spot"
-                </Button>
+                <SpotAddition spot_dto=None on_created=Callback::new(move |_| spots_page.refetch()) />
             </div>
 
             // ── 搜索栏 ────────────────────────────────────────────────────
@@ -177,13 +161,13 @@ pub fn SpotList() -> impl IntoView {
             <Card>
                 <CardContent class="p-0 overflow-hidden">
 
-                    // 表格（Suspense 包裹，加载中显示占位）
-                    <Suspense fallback=|| {
-                        view! {
-                            <div class="px-6 py-10 text-center text-muted-foreground text-sm">
-                                "Loading..."
-                            </div>
-                        }
+                    // 表格：spots_page 只在此 <Suspense> 的 view 闭包中读取，
+                    // 不在任何 Effect 中读取，确保 pending 状态由本地 Suspense 拦截，
+                    // 不会传播到 AuthGuard 的 SuspenseContext。
+                    <Suspense fallback=|| view! {
+                        <div class="px-6 py-10 text-center text-muted-foreground text-sm">
+                            "Loading..."
+                        </div>
                     }>
                         {move || {
                             let sb = spots_base.clone();
@@ -200,7 +184,18 @@ pub fn SpotList() -> impl IntoView {
                                     }
                                         .into_any()
                                 }
-                                Ok(v) => v,
+                                Ok(p) => {
+                                    // 在 Suspense view 内更新分页 signal（副作用），
+                                    // 避免在 Effect 中读取 spots_page
+                                    total_items.set(p.total);
+                                    let tp = if p.size == 0 {
+                                        1
+                                    } else {
+                                        ((p.total + p.size - 1) / p.size).max(1)
+                                    };
+                                    total_pages.set(tp);
+                                    p
+                                }
                             };
                             if page_data.data.is_empty() {
                                 return view! {
@@ -217,7 +212,8 @@ pub fn SpotList() -> impl IntoView {
                                             <TableHead class="w-14">"Cover"</TableHead>
                                             <TableHead>"Name"</TableHead>
                                             <TableHead>"Location"</TableHead>
-                                            <TableHead class="w-20">"Rating"</TableHead>
+                                            <TableHead>"Labels"</TableHead>
+                                        <TableHead class="w-20">"Rating"</TableHead>
                                             <TableHead class="w-42">"Updated"</TableHead>
                                             <TableHead class="w-28 text-right">"Actions"</TableHead>
                                         </TableRow>
@@ -232,12 +228,17 @@ pub fn SpotList() -> impl IntoView {
                                                 let id_confirm = spot_id.clone();
                                                 let id_delete = spot_id.clone();
                                                 let id_cancel = spot_id.clone();
-                                                let cover_url = spot.photo_urls.into_iter().next();
+
+                                                let cover_url = spot.photo_urls.first().cloned();
+                                                let name = spot.name.clone();
+                                                let location = spot.location.clone();
                                                 let rating_str = spot.rating.to_string();
+                                                let labels = spot.labels.clone();
                                                 let updated_str = spot
                                                     .updated_at
                                                     .format("%Y-%m-%d %H:%M")
                                                     .to_string();
+
                                                 view! {
                                                     <TableRow>
                                                         // 封面图
@@ -261,12 +262,28 @@ pub fn SpotList() -> impl IntoView {
 
                                                         // Name
                                                         <TableCell class="font-medium">
-                                                            {spot.name}
+                                                            {name}
                                                         </TableCell>
 
                                                         // Location
                                                         <TableCell class="text-muted-foreground max-w-[200px] truncate">
-                                                            {spot.location}
+                                                            {location}
+                                                        </TableCell>
+
+                                                        // Labels
+                                                        <TableCell>
+                                                            <div class="flex flex-wrap gap-1">
+                                                                {labels
+                                                                    .into_iter()
+                                                                    .map(|l| {
+                                                                        view! {
+                                                                            <span class="rounded-sm bg-secondary px-1.5 py-0.5 text-xs whitespace-nowrap">
+                                                                                {l.name}
+                                                                            </span>
+                                                                        }
+                                                                    })
+                                                                    .collect_view()}
+                                                            </div>
                                                         </TableCell>
 
                                                         // Rating
@@ -282,18 +299,11 @@ pub fn SpotList() -> impl IntoView {
                                                         // Actions
                                                         <TableCell>
                                                             <div class="flex items-center justify-end gap-1">
+                                                                // 详情
+                                                                <SpotDetail spot_detail=Some(spot.clone())/>
+
                                                                 // 编辑
-                                                                <Button
-                                                                    variant=ButtonVariant::Ghost
-                                                                    size=ButtonSize::IconSm
-                                                                    on:click={
-                                                                        let url = edit_url.clone();
-                                                                        move |_| nav_target
-                                                                            .set(Some(url.clone()))
-                                                                    }
-                                                                >
-                                                                    <Pencil class="size-3.5" />
-                                                                </Button>
+                                                                <SpotAddition spot_dto=Some(spot) on_created=Callback::new(move |_| spots_page.refetch()) />
 
                                                                 // 删除二次确认
                                                                 <Show
@@ -365,7 +375,7 @@ pub fn SpotList() -> impl IntoView {
                         }}
                     </Suspense>
 
-                    // ── 分页（Suspense 外，信号驱动，响应式更新）────────────
+                    // ── 分页（信号驱动，响应式更新）─────────────────────────
                     {move || {
                         let total = total_items.get();
                         if total == 0 {

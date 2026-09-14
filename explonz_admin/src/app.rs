@@ -5,11 +5,7 @@ use leptos_router::{
     path,
 };
 
-use crate::pages::{
-    auth_guard::AuthGuard,
-    home::index::Sidenav02Routes,
-    login::login::LoginPage,
-};
+use crate::pages::{auth_guard::AuthGuard, home::index::Sidenav02Routes, login::login::LoginPage};
 
 #[component]
 pub fn App() -> impl IntoView {

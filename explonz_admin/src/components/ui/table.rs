@@ -14,10 +14,7 @@ mod components {
 }
 
 #[component]
-pub fn Table(
-    #[prop(into, optional)] class: String,
-    children: Children,
-) -> impl IntoView {
+pub fn Table(#[prop(into, optional)] class: String, children: Children) -> impl IntoView {
     let merged = tw_merge::tw_merge!("w-full caption-bottom text-sm", class);
     view! {
         <div class="relative w-full overflow-auto">

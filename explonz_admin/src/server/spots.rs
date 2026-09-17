@@ -1,5 +1,8 @@
 use crate::server::ApiResp;
-use explonz_shared::common::{dto::SpotDto, pagination::Page};
+use explonz_shared::common::{
+    dto::{SeasonalPickingTypeDto, SpotDto},
+    pagination::Page,
+};
 use leptos::prelude::*;
 
 // 获取 Spot 列表（分页 + 按 id/name 过滤）
@@ -176,6 +179,101 @@ pub async fn create_spot(
         .ok_or_else(|| ServerFnError::new("No data returned"))
 }
 
+// 更新一个Spot
+#[server(UpdateSpot, "/api")]
+pub async fn update_spot(
+    spot_id: String,
+    name: String,
+    location: String,
+    latitude: f64,
+    longitude: f64,
+    description: String,
+    photo_urls: Vec<String>,
+    label_ids: Vec<String>,
+    phone: Option<String>,
+    website: Option<String>,
+    opening_hours_json: String,
+) -> Result<SpotDto, ServerFnError> {
+    let token = crate::server::extract_token().await?;
+
+    let photo_urls: Vec<String> = photo_urls
+        .into_iter()
+        .filter(|s| !s.trim().is_empty())
+        .collect();
+
+    let opening_hours: serde_json::Value = if opening_hours_json.trim().is_empty() {
+        serde_json::Value::Array(vec![])
+    } else {
+        serde_json::from_str(&opening_hours_json)
+            .map_err(|e| ServerFnError::new(format!("Invalid opening hours JSON: {e}")))?
+    };
+
+    let body = serde_json::json!({
+        "name": name,
+        "location": location,
+        "latitude": latitude,
+        "longitude": longitude,
+        "description": description,
+        "photo_urls": photo_urls,
+        "label_ids": label_ids,
+        "phone": phone,
+        "website": website,
+        "opening_hours": opening_hours,
+    });
+
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .put(format!("{backend_url}/api/spots/{spot_id}"))
+        .bearer_auth(&token)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<SpotDto> = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
+}
+
+// 获取 所有的seasonal_picking_types
+#[server(GetSeasonalPickingTypes, "/api")]
+pub async fn get_seasonal_picking_types() -> Result<Vec<SeasonalPickingTypeDto>, ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .get(format!("{backend_url}/api/spots/seasonal_picking_types"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<Vec<SeasonalPickingTypeDto>> = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
+}
+
 #[server(GeocodeLocation, "/api")]
 pub async fn geocode_location(address: String) -> Result<(f64, f64), ServerFnError> {
     use serde::Deserialize;
@@ -286,24 +384,8 @@ pub async fn upload_photo(
     Err(ServerFnError::new("No file field found"))
 }
 
-/// 删除图片（通知后端删除本地文件）
+/// 删除图片（无需通知后端删除本地文件，删除图片操作将由清理任务自动删除）
 #[server(DeletePhoto, "/api")]
 pub async fn delete_photo(img_id: String) -> Result<(), ServerFnError> {
-    let token = crate::server::extract_token().await?;
-
-    let backend_url = crate::server::backend_url();
-
-    let resp = reqwest::Client::new()
-        .delete(format!("{backend_url}/api/images/{img_id}"))
-        .bearer_auth(&token)
-        .send()
-        .await
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
-
-    if resp.status().is_success() {
-        Ok(())
-    } else {
-        let msg = resp.text().await.unwrap_or_default();
-        Err(ServerFnError::new(format!("Backend error: {msg}")))
-    }
+    Ok(())
 }

@@ -13,7 +13,7 @@ use crate::server::auth::get_current_user;
 #[component]
 pub fn AuthGuard() -> impl IntoView {
     let location = use_location();
-    let user = Resource::new_blocking(|| (), |_| get_current_user());
+    let user = Resource::new(|| (), |_| get_current_user());
 
     #[cfg(not(feature = "ssr"))]
     let navigate = use_navigate();

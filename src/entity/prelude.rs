@@ -5,6 +5,7 @@ pub use super::post_likes::Entity as PostLikes;
 pub use super::post_photos::Entity as PostPhotos;
 pub use super::posts::Entity as Posts;
 pub use super::refresh_tokens::Entity as RefreshTokens;
+pub use super::seasonal_picking_types::Entity as SeasonalPickingTypes;
 pub use super::seasonal_pickings::Entity as SeasonalPickings;
 pub use super::sign_up_otps::Entity as SignUpOtps;
 pub use super::spot_label_assignments::Entity as SpotLabelAssignments;

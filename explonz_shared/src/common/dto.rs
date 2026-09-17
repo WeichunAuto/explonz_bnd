@@ -93,6 +93,13 @@ pub struct LabelDto {
     pub icon: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonalPickingTypeDto {
+    pub id: Uuid,
+    pub name: String,
+}
+
 #[cfg(feature = "ssr")]
 impl From<crate::entity::posts::Model> for PostDto {
     fn from(m: crate::entity::posts::Model) -> Self {

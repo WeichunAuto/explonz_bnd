@@ -1,14 +1,18 @@
 use std::collections::HashMap;
 
-use explonz_shared::common::dto::{LabelDto, OpeningHourDto, SpotDto};
+use explonz_shared::common::dto::{LabelDto, OpeningHourDto, SeasonalPickingTypeDto, SpotDto};
 use explonz_shared::common::pagination::Page;
-use sea_orm::{ActiveModelTrait, ColumnTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+};
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, TransactionTrait};
 use uuid::Uuid;
 
-use crate::api::spots::dto::CreateSpotRequest;
+use crate::api::spots::dto::{CreateSpotRequest, UpdateSpotRequest};
 use crate::api::spots::handler::SpotQuery;
-use explonz_shared::entity::{prelude::*, spot_label_assignments, spot_labels, spot_opening_hours, spots};
+use explonz_shared::entity::{
+    prelude::*, spot_label_assignments, spot_labels, spot_opening_hours, spots,
+};
 
 pub async fn create_spot_service(
     db: &DatabaseConnection,
@@ -96,6 +100,93 @@ pub async fn create_spot_service(
     })
 }
 
+pub async fn update_spot_service(
+    db: &DatabaseConnection,
+    spot_id: Uuid,
+    req: UpdateSpotRequest,
+) -> anyhow::Result<SpotDto> {
+    let txn = db.begin().await?;
+
+    // 1. 找到 spot
+    let spot = Spots::find_by_id(spot_id)
+        .one(&txn)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Spot not found"))?;
+
+    // 2. 更新 spot 字段
+    let mut active: spots::ActiveModel = spot.into();
+    active.name = Set(req.name.clone());
+    active.location = Set(req.location);
+    active.latitude = Set(req.latitude);
+    active.longitude = Set(req.longitude);
+    active.description = Set(req.description);
+    active.photo_urls = Set(req.photo_urls);
+    active.phone = Set(req.phone);
+    active.website = Set(req.website);
+    let result = active.update(&txn).await?;
+
+    // 3. 删除旧 label 关联，重新插入
+    SpotLabelAssignments::delete_many()
+        .filter(spot_label_assignments::Column::SpotId.eq(spot_id))
+        .exec(&txn)
+        .await?;
+
+    let assignments: Vec<spot_label_assignments::ActiveModel> = req
+        .label_ids
+        .iter()
+        .filter_map(|id| id.parse::<Uuid>().ok())
+        .map(|label_id| spot_label_assignments::ActiveModel {
+            spot_id: Set(spot_id),
+            label_id: Set(label_id),
+        })
+        .collect();
+    if !assignments.is_empty() {
+        SpotLabelAssignments::insert_many(assignments)
+            .exec(&txn)
+            .await?;
+    }
+
+    // 4. 删除旧营业时间，重新插入
+    SpotOpeningHours::delete_many()
+        .filter(spot_opening_hours::Column::SpotId.eq(spot_id))
+        .exec(&txn)
+        .await?;
+
+    let opening_hours: Vec<spot_opening_hours::ActiveModel> = req
+        .opening_hours
+        .into_iter()
+        .map(|h| {
+            let parse_time = |s: Option<String>| {
+                s.and_then(|t| chrono::NaiveTime::parse_from_str(&t, "%H:%M").ok())
+            };
+            spot_opening_hours::ActiveModel {
+                spot_id: Set(spot_id),
+                day_of_week: Set(h.day_of_week),
+                is_closed: Set(h.is_closed),
+                is_open_24h: Set(h.is_open_24h),
+                open_time: Set(parse_time(h.open_time)),
+                close_time: Set(parse_time(h.close_time)),
+                ..Default::default()
+            }
+        })
+        .collect();
+    if !opening_hours.is_empty() {
+        SpotOpeningHours::insert_many(opening_hours)
+            .exec(&txn)
+            .await?;
+    }
+
+    txn.commit().await?;
+
+    tracing::info!("spot has been updated, spot name: {}", req.name);
+
+    let (mut labels_map, mut hours_map) = load_labels_and_hours(db, &[spot_id]).await;
+    let mut dto = SpotDto::from(result);
+    dto.labels = labels_map.remove(&spot_id).unwrap_or_default();
+    dto.opening_hours = hours_map.remove(&spot_id).unwrap_or_default();
+    Ok(dto)
+}
+
 // 获取所有分页 Spots（含 labels + opening_hours）
 pub async fn get_spots_service(db: &DatabaseConnection, spot_params: SpotQuery) -> Page<SpotDto> {
     let mut query = Spots::find();
@@ -159,11 +250,31 @@ pub async fn get_spot_service(
     Ok(Some(dto))
 }
 
+// 获取所有的 seasonal_picking_types
+pub async fn get_seasonal_picking_types_service(
+    db: &DatabaseConnection,
+) -> anyhow::Result<Vec<SeasonalPickingTypeDto>> {
+    let model = SeasonalPickingTypes::find().all(db).await?;
+
+    let seasonal_picking_types = model
+        .iter()
+        .map(|item| SeasonalPickingTypeDto {
+            id: item.id,
+            name: item.name.clone(),
+        })
+        .collect::<Vec<SeasonalPickingTypeDto>>();
+    // tracing::info!("seasonal_picking_types: {:?}", seasonal_picking_types);
+    Ok(seasonal_picking_types)
+}
+
 /// 批量加载 labels 和 opening_hours，返回两个 HashMap (spot_id -> Vec)
 async fn load_labels_and_hours(
     db: &DatabaseConnection,
     spot_ids: &[Uuid],
-) -> (HashMap<Uuid, Vec<LabelDto>>, HashMap<Uuid, Vec<OpeningHourDto>>) {
+) -> (
+    HashMap<Uuid, Vec<LabelDto>>,
+    HashMap<Uuid, Vec<OpeningHourDto>>,
+) {
     // 1. labels: spot_label_assignments JOIN spot_labels
     let assignments: Vec<(spot_label_assignments::Model, Option<spot_labels::Model>)> =
         SpotLabelAssignments::find()
@@ -176,12 +287,15 @@ async fn load_labels_and_hours(
     let mut labels_map: HashMap<Uuid, Vec<LabelDto>> = HashMap::new();
     for (assignment, label_opt) in assignments {
         if let Some(label) = label_opt {
-            labels_map.entry(assignment.spot_id).or_default().push(LabelDto {
-                id: label.id,
-                name: label.name,
-                description: label.description,
-                icon: label.icon,
-            });
+            labels_map
+                .entry(assignment.spot_id)
+                .or_default()
+                .push(LabelDto {
+                    id: label.id,
+                    name: label.name,
+                    description: label.description,
+                    icon: label.icon,
+                });
         }
     }
 

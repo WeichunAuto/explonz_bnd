@@ -16,19 +16,10 @@ pub struct Model {
     pub season_end_day: i16,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
-    pub picking_type_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::seasonal_picking_types::Entity",
-        from = "Column::PickingTypeId",
-        to = "super::seasonal_picking_types::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Restrict"
-    )]
-    SeasonalPickingTypes,
     #[sea_orm(
         belongs_to = "super::spots::Entity",
         from = "Column::SpotId",
@@ -37,12 +28,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Spots,
-}
-
-impl Related<super::seasonal_picking_types::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::SeasonalPickingTypes.def()
-    }
 }
 
 impl Related<super::spots::Entity> for Entity {

@@ -27,6 +27,22 @@ pub struct OpeningHourInput {
     pub close_time: Option<String>, // "HH:MM"
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateSpotRequest {
+    pub name: String,
+    pub location: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub description: String,
+    #[serde(default)]
+    pub photo_urls: Vec<String>,
+    #[serde(default)]
+    pub label_ids: Vec<String>,
+    pub phone: Option<String>,
+    pub website: Option<String>,
+    pub opening_hours: Vec<OpeningHourInput>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImageUploadResponse {
     pub id: String,

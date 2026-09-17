@@ -6,7 +6,7 @@ use axum::{
     Json,
 };
 use explonz_shared::common::{
-    dto::SpotDto,
+    dto::{SeasonalPickingTypeDto, SpotDto},
     pagination::{Page, Pagination},
     utils::dir_into_url_path,
 };
@@ -15,12 +15,15 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    api::spots::dto::{CreateSpotRequest, ImageUploadResponse},
+    api::spots::dto::{CreateSpotRequest, ImageUploadResponse, UpdateSpotRequest},
     application::AppState,
     error::ApiError,
     request::{BPath, BValidQuery},
     response::{ApiResponse, ApiResult},
-    service::spots::{create_spot_service, get_spot_service, get_spots_service},
+    service::spots::{
+        create_spot_service, get_seasonal_picking_types_service, get_spot_service,
+        get_spots_service, update_spot_service,
+    },
 };
 
 // Spot 查询条的件参数
@@ -75,6 +78,31 @@ pub async fn get_spot(
         .map_err(ApiError::InternalError)?
         .ok_or(ApiError::NotFoundError)?;
     Ok(ApiResponse::success("ok", Some(spot)))
+}
+
+#[debug_handler]
+#[tracing::instrument(name = "update_spot", skip_all)]
+pub async fn update_spot(
+    State(AppState { db, .. }): State<AppState>,
+    BPath(spot_id): BPath<Uuid>,
+    Json(spot_request): Json<UpdateSpotRequest>,
+) -> ApiResult<SpotDto> {
+    let spot = update_spot_service(&db, spot_id, spot_request)
+        .await
+        .map_err(ApiError::InternalError)?;
+    Ok(ApiResponse::success("spot updated", Some(spot)))
+}
+
+// 获取所有的 seasonal_picking_types
+pub async fn get_seasonal_picking_types(
+    State(AppState { db, .. }): State<AppState>,
+) -> ApiResult<Vec<SeasonalPickingTypeDto>> {
+    let seasional_picking_types: Vec<SeasonalPickingTypeDto> =
+        get_seasonal_picking_types_service(&db).await?;
+    Ok(ApiResponse::success(
+        "success",
+        Some(seasional_picking_types),
+    ))
 }
 
 #[debug_handler]

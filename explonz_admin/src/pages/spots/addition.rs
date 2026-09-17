@@ -12,7 +12,7 @@ use crate::components::ui::sheet::{
     SheetHeader, SheetTitle, SheetTrigger,
 };
 use crate::server::labels::get_labels;
-use crate::server::spots::{geocode_location, CreateSpot};
+use crate::server::spots::{geocode_location, CreateSpot, UpdateSpot};
 use explonz_shared::icons::LabelIcon;
 
 const TEXTAREA_CLASS: &str = "text-foreground placeholder:text-muted-foreground border-input \
@@ -37,7 +37,7 @@ struct DaySchedule {
 #[derive(Clone)]
 struct PhotoItem {
     id: u32,
-    status: RwSignal<PhotoStatus>,
+    status: PhotoStatus,
 }
 
 #[derive(Clone)]
@@ -48,20 +48,22 @@ enum PhotoStatus {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn upload_file(file: web_sys::File, status: RwSignal<PhotoStatus>) {
+fn upload_file(file: web_sys::File, id: u32, photos: RwSignal<Vec<PhotoItem>>) {
     use crate::server::spots::upload_photo;
     use server_fn::codec::MultipartData;
 
     leptos::task::spawn_local(async move {
         let form_data = web_sys::FormData::new().unwrap();
         let _ = form_data.append_with_blob("file", &file);
-        match upload_photo(MultipartData::from(form_data)).await {
-            Ok(resp) => status.set(PhotoStatus::Done {
-                img_id: resp.id,
-                url: resp.url,
-            }),
-            Err(e) => status.set(PhotoStatus::Failed(format!("{e}"))),
-        }
+        let new_status = match upload_photo(MultipartData::from(form_data)).await {
+            Ok(resp) => PhotoStatus::Done { img_id: resp.id, url: resp.url },
+            Err(e) => PhotoStatus::Failed(format!("{e}")),
+        };
+        photos.update(|v| {
+            if let Some(p) = v.iter_mut().find(|p| p.id == id) {
+                p.status = new_status;
+            }
+        });
     });
 }
 
@@ -75,14 +77,8 @@ fn process_files(
         if let Some(file) = files.item(i) {
             let local_id = next_id.get_untracked();
             next_id.update(|n| *n += 1);
-            let status = RwSignal::new(PhotoStatus::Uploading);
-            photos.update(|v| {
-                v.push(PhotoItem {
-                    id: local_id,
-                    status,
-                })
-            });
-            upload_file(file, status);
+            photos.update(|v| v.push(PhotoItem { id: local_id, status: PhotoStatus::Uploading }));
+            upload_file(file, local_id, photos);
         }
     }
 }
@@ -142,6 +138,8 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
     let close_btn_ref = NodeRef::<leptos::html::Button>::new();
 
     let create_action = ServerAction::<CreateSpot>::new();
+    let update_action = ServerAction::<UpdateSpot>::new();
+    let spot_id_str = s.id.to_string();
 
     // ── 基础字段 signal（用 spot 数据初始化）─────────────────────────────────
     let name_val = RwSignal::new(s.name.clone());
@@ -192,7 +190,7 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
             let img_id = url.rsplit('/').next().unwrap_or("").to_string();
             PhotoItem {
                 id: i as u32,
-                status: RwSignal::new(PhotoStatus::Done { img_id, url: url.clone() }),
+                status: PhotoStatus::Done { img_id, url: url.clone() },
             }
         })
         .collect();
@@ -203,8 +201,16 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
 
     // ── Location / geocode ────────────────────────────────────────────────────
     let location_val = RwSignal::new(s.location.clone());
-    let lat = RwSignal::new(if s.latitude != 0.0 { s.latitude.to_string() } else { String::new() });
-    let lng = RwSignal::new(if s.longitude != 0.0 { s.longitude.to_string() } else { String::new() });
+    let lat = RwSignal::new(if s.latitude != 0.0 {
+        s.latitude.to_string()
+    } else {
+        String::new()
+    });
+    let lng = RwSignal::new(if s.longitude != 0.0 {
+        s.longitude.to_string()
+    } else {
+        String::new()
+    });
 
     let geocode_action = Action::new(move |address: &String| {
         let address = address.clone();
@@ -219,12 +225,20 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
     });
 
     // ── Opening hours（编辑模式：从 spot.opening_hours 初始化）───────────────
-    const DAY_NAMES: [&str; 7] =
-        ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const DAY_NAMES: [&str; 7] = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+    ];
     let schedules: Vec<(&'static str, DaySchedule)> = (0usize..7)
         .map(|i| {
             let name = DAY_NAMES[i];
-            let sched = if let Some(h) = s.opening_hours.iter().find(|h| h.day_of_week == i as i16) {
+            let sched = if let Some(h) = s.opening_hours.iter().find(|h| h.day_of_week == i as i16)
+            {
                 let status = if h.is_closed {
                     DayStatus::Closed
                 } else if h.is_open_24h {
@@ -243,7 +257,11 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
                 }
             } else {
                 // 无数据时的默认值：周一~五 Open，周六日 Closed
-                let default_status = if i == 0 || i == 6 { DayStatus::Closed } else { DayStatus::Open };
+                let default_status = if i == 0 || i == 6 {
+                    DayStatus::Closed
+                } else {
+                    DayStatus::Open
+                };
                 DaySchedule {
                     status: RwSignal::new(default_status),
                     open_time: RwSignal::new("09:00".to_string()),
@@ -282,14 +300,20 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
         serde_json::to_string(&entries).unwrap_or_default()
     });
 
-    // ── On success: call parent callback + close sheet ────────────────────────
+    // ── On success: close sheet first (while component is still mounted), then refresh list ──
     Effect::new(move |_| {
-        if let Some(Ok(_)) = create_action.value().get() {
-            on_created.run(());
+        let create_done = matches!(create_action.value().get(), Some(Ok(_)));
+        let update_done = matches!(update_action.value().get(), Some(Ok(_)));
+        if create_done || update_done {
+            // Close the sheet BEFORE calling on_created, because on_created triggers
+            // spots_page.refetch() which unmounts this component via Suspense. If btn.click()
+            // were called after on_created, the button would be detached and its parent div's
+            // Rust closures would already be dropped, causing "closure invoked after being dropped".
             #[cfg(target_arch = "wasm32")]
             if let Some(btn) = close_btn_ref.get() {
                 let _ = btn.click();
             }
+            on_created.run(());
         }
     });
 
@@ -312,7 +336,7 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
         // ==============================
         // Form (wraps Body + Footer so hidden inputs are included in submission)
         // ==============================
-        <ActionForm action=create_action>
+        <div>
 
             <SheetBody>
                 <div class="flex flex-col gap-5">
@@ -419,6 +443,7 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
                                     multiple=true
                                     class="hidden"
                                     node_ref=file_input_ref
+                                    on:click=|e| e.stop_propagation()
                                     on:change=move |_e| {
                                         #[cfg(target_arch = "wasm32")]
                                         {
@@ -438,22 +463,22 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
                             </div>
 
                             // Preview grid
-                            <Show when=move || !photos.get().is_empty()>
-                                <div class="flex flex-wrap gap-2 content-start flex-1 \
-                                            min-h-0 max-h-36 overflow-y-auto">
-                                    <For
-                                        each=move || photos.get()
-                                        key=|p| p.id
-                                        children=move |item| {
-                                            let status = item.status;
+                            {move || {
+                                let list = photos.get();
+                                if list.is_empty() {
+                                    return view! { <div /> }.into_any();
+                                }
+                                view! {
+                                    <div class="flex flex-wrap gap-2 content-start flex-1 \
+                                                min-h-0 max-h-36 overflow-y-auto">
+                                        {list.into_iter().map(|item| {
                                             let local_id = item.id;
-                                            let is_cover = move || {
-                                                photos.get().first().map(|p| p.id) == Some(local_id)
-                                            };
+                                            let is_cover = photos.get_untracked()
+                                                .first().map(|p| p.id) == Some(local_id);
                                             view! {
                                                 <div class="relative group shrink-0 w-32 h-32 \
                                                             rounded-lg border bg-muted">
-                                                    {move || match status.get() {
+                                                    {match item.status {
                                                         PhotoStatus::Uploading => view! {
                                                             <div class="w-full h-full flex \
                                                                         items-center justify-center">
@@ -462,17 +487,21 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
                                                                             border-t-transparent" />
                                                             </div>
                                                         }.into_any(),
-                                                        PhotoStatus::Done { url, img_id } => view! {
+                                                        PhotoStatus::Done { url, .. } => view! {
                                                             <img src=url.clone()
                                                                 class="w-full h-full object-cover rounded-lg" />
-                                                            <Show when=is_cover>
-                                                                <span class="absolute top-1 left-1 text-xs \
-                                                                             bg-primary text-primary-foreground \
-                                                                             px-1.5 py-0.5 rounded font-medium \
-                                                                             pointer-events-none">
-                                                                    "Cover"
-                                                                </span>
-                                                            </Show>
+                                                            {if is_cover {
+                                                                view! {
+                                                                    <span class="absolute top-1 left-1 text-xs \
+                                                                                 bg-primary text-primary-foreground \
+                                                                                 px-1.5 py-0.5 rounded font-medium \
+                                                                                 pointer-events-none">
+                                                                        "Cover"
+                                                                    </span>
+                                                                }.into_any()
+                                                            } else {
+                                                                view! { <div /> }.into_any()
+                                                            }}
                                                             <button
                                                                 type="button"
                                                                 class="absolute top-1 right-1 bg-destructive \
@@ -481,12 +510,7 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
                                                                        transition-opacity"
                                                                 on:click=move |e| {
                                                                     e.stop_propagation();
-                                                                    let id = img_id.clone();
-                                                                    leptos::task::spawn_local(async move {
-                                                                        use crate::server::spots::delete_photo;
-                                                                        let _ = delete_photo(id).await;
-                                                                        photos.update(|v| v.retain(|p| p.id != local_id));
-                                                                    });
+                                                                    photos.update(|v| v.retain(|p| p.id != local_id));
                                                                 }
                                                             >
                                                                 <Trash2 class="size-3" />
@@ -502,16 +526,16 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
                                                     }}
                                                 </div>
                                             }
-                                        }
-                                    />
-                                </div>
-                            </Show>
+                                        }).collect_view()}
+                                    </div>
+                                }.into_any()
+                            }}
                         </div>
 
                         // Hidden photo URL fields
                         {move || photos.get().into_iter()
                             .filter_map(|p| {
-                                if let PhotoStatus::Done { url, .. } = p.status.get() {
+                                if let PhotoStatus::Done { url, .. } = p.status {
                                     Some(view! { <input type="hidden" name="photo_urls[]" value=url /> })
                                 } else { None }
                             })
@@ -782,23 +806,85 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
             // Footer
             // ==============================
             <SheetFooter class="flex flex-row">
-                {move || create_action.value().get()
-                    .and_then(|r| r.err())
-                    .map(|e| view! {
+                {move || {
+                    let err = create_action.value().get()
+                        .and_then(|r| r.err())
+                        .or_else(|| update_action.value().get().and_then(|r| r.err()));
+                    err.map(|e| view! {
                         <p class="text-sm text-destructive">{e.to_string()}</p>
-                    })}
+                    })
+                }}
 
                 <SheetClose variant=ButtonVariant::Outline>"Cancel"</SheetClose>
 
-                <Button attr:disabled=move || create_action.pending().get()>
-                    {move || if create_action.pending().get() {
-                        if is_edit { "Saving..." } else { "Creating..." }
-                    } else {
-                        if is_edit { "Save Spot" } else { "Create Spot" }
+                <Button
+                    attr:r#type="button"
+                    attr:disabled=move || create_action.pending().get() || update_action.pending().get()
+                    on:click=move |_| {
+                        let photo_urls: Vec<String> = photos.get_untracked().into_iter()
+                            .filter_map(|p| {
+                                if let PhotoStatus::Done { url, .. } = p.status {
+                                    Some(url)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        let label_ids: Vec<String> = selected_labels.get_untracked()
+                            .into_iter()
+                            .map(|l| l.id.to_string())
+                            .collect();
+                        let phone = {
+                            let v = phone_val.get_untracked();
+                            if v.trim().is_empty() { None } else { Some(v) }
+                        };
+                        let website = {
+                            let v = website_val.get_untracked();
+                            if v.trim().is_empty() { None } else { Some(v) }
+                        };
+                        let lat_val = lat.get_untracked().parse::<f64>().unwrap_or(0.0);
+                        let lng_val = lng.get_untracked().parse::<f64>().unwrap_or(0.0);
+                        if is_edit {
+                            update_action.dispatch(UpdateSpot {
+                                spot_id: spot_id_str.clone(),
+                                name: name_val.get_untracked(),
+                                location: location_val.get_untracked(),
+                                latitude: lat_val,
+                                longitude: lng_val,
+                                description: description_val.get_untracked(),
+                                photo_urls,
+                                label_ids,
+                                phone,
+                                website,
+                                opening_hours_json: hours_memo.get_untracked(),
+                            });
+                        } else {
+                            create_action.dispatch(CreateSpot {
+                                name: name_val.get_untracked(),
+                                location: location_val.get_untracked(),
+                                latitude: lat_val,
+                                longitude: lng_val,
+                                description: description_val.get_untracked(),
+                                photo_urls,
+                                label_ids,
+                                phone,
+                                website,
+                                opening_hours_json: hours_memo.get_untracked(),
+                            });
+                        }
+                    }
+                >
+                    {move || {
+                        let pending = create_action.pending().get() || update_action.pending().get();
+                        if pending {
+                            if is_edit { "Saving..." } else { "Creating..." }
+                        } else {
+                            if is_edit { "Save Spot" } else { "Create Spot" }
+                        }
                     }}
                 </Button>
             </SheetFooter>
 
-        </ActionForm>
+        </div>
     }
 }

@@ -19,3 +19,4 @@ pub mod tips;
 pub mod user_auth_providers;
 pub mod user_saved_spots;
 pub mod users;
+pub mod seasonal_picking_types;

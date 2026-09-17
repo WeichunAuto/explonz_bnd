@@ -8,6 +8,7 @@ pub mod post_photos;
 pub mod posts;
 pub mod refresh_tokens;
 pub mod sea_orm_active_enums;
+pub mod seasonal_picking_types;
 pub mod seasonal_pickings;
 pub mod sign_up_otps;
 pub mod spot_label_assignments;

@@ -1,3 +1,4 @@
+use explonz_shared::common::dto::SeasonalPickingTypeDto;
 use explonz_shared::common::{dto::SpotDto, pagination::Page};
 use icons::{Trash2, X};
 use leptos::prelude::*;
@@ -10,12 +11,22 @@ use crate::components::ui::label::Label;
 use crate::components::ui::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
 use crate::pages::spots::addition::SpotAddition;
 use crate::pages::spots::detail::SpotDetail;
+use crate::pages::spots::seasonal_picks::SeasonalPicks;
 use crate::server::spots::{get_spots, DeleteSpot};
 
-const PAGE_SIZE: u64 = 2;
+const PAGE_SIZE: u64 = 3;
 
 #[component]
 pub fn SpotList() -> impl IntoView {
+    // 父组件缓存 SeasonalPickingTypes
+    let seasonal_types = RwSignal::new(None::<Vec<SeasonalPickingTypeDto>>);
+
+    // 传递给子组件的回调函数，在子组件第一次加载时请求 seasonal_types 数据
+    let on_loaded = Callback::new(move |data: Vec<SeasonalPickingTypeDto>| {
+        println!("data: {:?}", data);
+        seasonal_types.set(Some(data));
+    });
+
     // ── 导航 ─────────────────────────────────────────────────────────────
     let location = use_location();
     let navigate = use_navigate();
@@ -228,6 +239,7 @@ pub fn SpotList() -> impl IntoView {
                                                 let id_confirm = spot_id.clone();
                                                 let id_delete = spot_id.clone();
                                                 let id_cancel = spot_id.clone();
+                                                let id_seasonal_picks = spot_id.clone();
 
                                                 let cover_url = spot.photo_urls.first().cloned();
                                                 let name = spot.name.clone();
@@ -362,6 +374,8 @@ pub fn SpotList() -> impl IntoView {
                                                                         </Button>
                                                                     </div>
                                                                 </Show>
+
+                                                                <SeasonalPicks spot_id=id_seasonal_picks seasonal_types=seasonal_types.read_only() on_load=on_loaded/>
                                                             </div>
                                                         </TableCell>
                                                     </TableRow>

@@ -10,3 +10,4 @@ pub mod separator;
 pub mod sheet;
 pub mod sidenav;
 pub mod table;
+pub mod dialog;

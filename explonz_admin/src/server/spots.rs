@@ -246,6 +246,46 @@ pub async fn update_spot(
         .ok_or_else(|| ServerFnError::new("No data returned"))
 }
 
+// 为 Spot 创建一条 SeasonalPicking
+#[server(CreateSeasonalPicking, "/api")]
+pub async fn create_seasonal_picking(
+    spot_id: String,
+    picking_type_id: String,
+    season_start_month: i16,
+    season_start_day: i16,
+    season_end_month: i16,
+    season_end_day: i16,
+) -> Result<(), ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let body = serde_json::json!({
+        "picking_type_id": picking_type_id,
+        "season_start_month": season_start_month,
+        "season_start_day": season_start_day,
+        "season_end_month": season_end_month,
+        "season_end_day": season_end_day,
+    });
+
+    println!("spot_id: {}", spot_id);
+    println!("body: {}", body);
+
+    let resp = reqwest::Client::new()
+        .post(format!("{backend_url}/api/spots/{spot_id}/seasonal_pickings/new"))
+        .bearer_auth(&token)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        let msg = resp.text().await.unwrap_or_default();
+        Err(ServerFnError::new(format!("Backend error: {msg}")))
+    }
+}
+
 // 获取 所有的seasonal_picking_types
 #[server(GetSeasonalPickingTypes, "/api")]
 pub async fn get_seasonal_picking_types() -> Result<Vec<SeasonalPickingTypeDto>, ServerFnError> {

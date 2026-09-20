@@ -188,7 +188,11 @@ pub async fn update_spot_service(
 }
 
 // 获取所有分页 Spots（含 labels + opening_hours）
-pub async fn get_spots_service(db: &DatabaseConnection, spot_params: SpotQuery) -> Page<SpotDto> {
+pub async fn get_spots_service(
+    db: &DatabaseConnection,
+    public_url: &str,
+    spot_params: SpotQuery,
+) -> Page<SpotDto> {
     let mut query = Spots::find();
     if let Some(spot_id) = spot_params.id {
         query = query.filter(spots::Column::Id.eq(spot_id))
@@ -225,6 +229,24 @@ pub async fn get_spots_service(db: &DatabaseConnection, spot_params: SpotQuery) 
         .map(|m| {
             let id = m.id;
             let mut dto = SpotDto::from(m);
+
+            // 修正 spot 的图片地址
+            let trimed_urls: Vec<String> = dto
+                .photo_urls
+                .iter()
+                .map(|url| {
+                    format!(
+                        "{}{}",
+                        public_url,
+                        url.find("/uploads/")
+                            .map(|i| &url[i..])
+                            .unwrap_or_default()
+                            .to_string()
+                    )
+                })
+                .collect();
+            dto.photo_urls = trimed_urls;
+
             dto.labels = labels_map.get(&id).cloned().unwrap_or_default();
             dto.opening_hours = hours_map.get(&id).cloned().unwrap_or_default();
             dto

@@ -59,10 +59,10 @@ pub async fn create_spot(
 #[debug_handler]
 #[tracing::instrument(name = "get_spots", skip_all)]
 pub async fn get_spots(
-    State(AppState { db, .. }): State<AppState>,
+    State(AppState { db, public_url, .. }): State<AppState>,
     BValidQuery(spot_params): BValidQuery<SpotQuery>,
 ) -> ApiResult<Page<SpotDto>> {
-    let spots_with_page = get_spots_service(&db, spot_params).await;
+    let spots_with_page = get_spots_service(&db, &public_url, spot_params).await;
     Ok(ApiResponse::success("ok", Some(spots_with_page)))
 }
 

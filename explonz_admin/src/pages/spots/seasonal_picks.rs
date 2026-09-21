@@ -4,7 +4,7 @@ use crate::components::ui::dialog::{
     DialogTitle, DialogTrigger,
 };
 use crate::server::spots::{create_seasonal_picking, get_seasonal_picking_types};
-use explonz_shared::common::dto::SeasonalPickingTypeDto;
+use explonz_shared::common::dto::{SeasonalPickingTypeDto, SeasonalPickingsDto};
 use icons::{Check, Plus, TimerReset, Trash2};
 use leptos::task::spawn_local;
 use leptos::{logging, prelude::*};
@@ -39,15 +39,6 @@ struct DraftPicking {
     end_day: RwSignal<u8>,
 }
 
-struct SavePickingInput {
-    spot_id: String,
-    type_id: String,
-    start_month: i16,
-    start_day: i16,
-    end_month: i16,
-    end_day: i16,
-}
-
 #[component]
 pub fn SeasonalPicks(
     spot_id: String,
@@ -66,7 +57,7 @@ pub fn SeasonalPicks(
         spawn_local(async move {
             match get_seasonal_picking_types().await {
                 Ok(data) => {
-                    logging::log!("seasonal_picking_types_data: {:?}", data);
+                    // logging::log!("seasonal_picking_types_data: {:?}", data);
                     on_load.run(data);
                 }
                 Err(err) => {
@@ -191,8 +182,8 @@ fn DraftPickingRow(
 
     let save_error: RwSignal<Option<String>> = RwSignal::new(None);
 
-    let save_action: Action<SavePickingInput, Result<(), ServerFnError>> =
-        Action::new(|input: &SavePickingInput| {
+    let save_action: Action<SeasonalPickingsDto, Result<(), ServerFnError>> =
+        Action::new(|input: &SeasonalPickingsDto| {
             let spot_id = input.spot_id.clone();
             let type_id = input.type_id.clone();
             let sm = input.start_month;
@@ -214,7 +205,7 @@ fn DraftPickingRow(
             return;
         }
         save_error.set(None);
-        save_action.dispatch(SavePickingInput {
+        save_action.dispatch(SeasonalPickingsDto {
             spot_id: spot_id.clone(),
             type_id: type_id_val,
             start_month: start_month.get_untracked() as i16,

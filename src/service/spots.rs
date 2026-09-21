@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use explonz_shared::common::dto::{LabelDto, OpeningHourDto, SeasonalPickingTypeDto, SpotDto};
+use explonz_shared::common::dto::{
+    LabelDto, OpeningHourDto, SeasonalPickingTypeDto, SeasonalPickingsDto, SpotDto,
+};
 use explonz_shared::common::pagination::Page;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
@@ -11,7 +13,7 @@ use uuid::Uuid;
 use crate::api::spots::dto::{CreateSpotRequest, UpdateSpotRequest};
 use crate::api::spots::handler::SpotQuery;
 use explonz_shared::entity::{
-    prelude::*, spot_label_assignments, spot_labels, spot_opening_hours, spots,
+    prelude::*, seasonal_pickings, spot_label_assignments, spot_labels, spot_opening_hours, spots,
 };
 
 pub async fn create_spot_service(
@@ -230,7 +232,7 @@ pub async fn get_spots_service(
             let id = m.id;
             let mut dto = SpotDto::from(m);
 
-            // 修正 spot 的图片地址
+            // 修正 spot 的图片地址, 拼接服务器地址
             let trimed_urls: Vec<String> = dto
                 .photo_urls
                 .iter()
@@ -342,4 +344,26 @@ async fn load_labels_and_hours(
     }
 
     (labels_map, hours_map)
+}
+
+// 为 Spot 创建一条 SeasonalPicking
+pub async fn create_seasonal_picking_service(
+    db: &DatabaseConnection,
+    spot_id: Uuid,
+    seasonal_pickings_params: SeasonalPickingsDto,
+) -> anyhow::Result<()> {
+    tracing::info!("payload: {:?}", seasonal_pickings_params);
+    let model = seasonal_pickings::ActiveModel {
+        spot_id: Set(spot_id),
+        season_start_month: Set(seasonal_pickings_params.start_month),
+        season_start_day: Set(seasonal_pickings_params.start_day),
+        season_end_month: Set(seasonal_pickings_params.end_month),
+        season_end_day: Set(seasonal_pickings_params.end_day),
+        picking_type_id: Set(Uuid::parse_str(seasonal_pickings_params.type_id.as_ref())
+            .map_err(|e| format!("Invalid UUID: {e}"))
+            .unwrap()),
+        ..Default::default()
+    };
+    model.insert(db).await?;
+    Ok(())
 }

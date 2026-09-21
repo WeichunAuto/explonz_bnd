@@ -4,8 +4,7 @@ use axum::{
 };
 
 use crate::{
-    api::spots::handler::{create_spot, get_spot, get_spots, update_spot, upload_image, get_seasonal_picking_types},
-    application::AppState,
+    api::spots::handler::{create_seasonal_picking, create_spot, get_seasonal_picking_types, get_spot, get_spots, update_spot, upload_image}, application::AppState,
 };
 
 pub mod dto;
@@ -19,4 +18,5 @@ pub(crate) fn routes() -> Router<AppState> {
         .route("/spots/new", post(create_spot))
         .route("/spots/images", post(upload_image))
         .route("/spots/seasonal_picking_types", get(get_seasonal_picking_types))
+        .route("/spots/{spot_id}/seasonal_pickings/new", post(create_seasonal_picking))
 }

@@ -250,7 +250,7 @@ pub async fn update_spot(
 #[server(CreateSeasonalPicking, "/api")]
 pub async fn create_seasonal_picking(
     spot_id: String,
-    picking_type_id: String,
+    type_id: String,
     season_start_month: i16,
     season_start_day: i16,
     season_end_month: i16,
@@ -260,18 +260,21 @@ pub async fn create_seasonal_picking(
     let backend_url = crate::server::backend_url();
 
     let body = serde_json::json!({
-        "picking_type_id": picking_type_id,
-        "season_start_month": season_start_month,
-        "season_start_day": season_start_day,
-        "season_end_month": season_end_month,
-        "season_end_day": season_end_day,
+        "spot_id": spot_id,
+        "type_id": type_id,
+        "start_month": season_start_month,
+        "start_day": season_start_day,
+        "end_month": season_end_month,
+        "end_day": season_end_day,
     });
 
     println!("spot_id: {}", spot_id);
     println!("body: {}", body);
 
     let resp = reqwest::Client::new()
-        .post(format!("{backend_url}/api/spots/{spot_id}/seasonal_pickings/new"))
+        .post(format!(
+            "{backend_url}/api/spots/{spot_id}/seasonal_pickings/new"
+        ))
         .bearer_auth(&token)
         .json(&body)
         .send()

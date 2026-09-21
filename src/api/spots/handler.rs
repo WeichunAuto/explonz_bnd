@@ -2,11 +2,11 @@ use std::{net::SocketAddr, path::Path};
 
 use axum::{
     debug_handler,
-    extract::{ConnectInfo, Multipart, State},
+    extract::{ConnectInfo, Multipart, Query, State},
     Json,
 };
 use explonz_shared::common::{
-    dto::{SeasonalPickingTypeDto, SpotDto},
+    dto::{SeasonalPickingTypeDto, SeasonalPickingsDto, SpotDto},
     pagination::{Page, Pagination},
     utils::dir_into_url_path,
 };
@@ -21,8 +21,8 @@ use crate::{
     request::{BPath, BValidQuery},
     response::{ApiResponse, ApiResult},
     service::spots::{
-        create_spot_service, get_seasonal_picking_types_service, get_spot_service,
-        get_spots_service, update_spot_service,
+        create_seasonal_picking_service, create_spot_service, get_seasonal_picking_types_service,
+        get_spot_service, get_spots_service, update_spot_service,
     },
 };
 
@@ -94,6 +94,7 @@ pub async fn update_spot(
 }
 
 // 获取所有的 seasonal_picking_types
+#[debug_handler]
 pub async fn get_seasonal_picking_types(
     State(AppState { db, .. }): State<AppState>,
 ) -> ApiResult<Vec<SeasonalPickingTypeDto>> {
@@ -103,6 +104,17 @@ pub async fn get_seasonal_picking_types(
         "success",
         Some(seasional_picking_types),
     ))
+}
+
+// 为 Spot 创建一条 SeasonalPicking
+#[debug_handler]
+pub async fn create_seasonal_picking(
+    State(AppState { db, .. }): State<AppState>,
+    BPath(spot_id): BPath<Uuid>,
+    Json(seasonal_pickings_params): Json<SeasonalPickingsDto>,
+) -> ApiResult<()> {
+    create_seasonal_picking_service(&db, spot_id, seasonal_pickings_params).await?;
+    Ok(ApiResponse::success("ok", None))
 }
 
 #[debug_handler]

@@ -1,7 +1,6 @@
 use crate::server::ApiResp;
 use explonz_shared::common::{
-    dto::{SeasonalPickingTypeDto, SpotDto},
-    pagination::Page,
+    dto::{SeasonalPickingTypeDto, SeasonalPickingsDto, SpotDto}, pagination::Page,
 };
 use leptos::prelude::*;
 
@@ -268,15 +267,63 @@ pub async fn create_seasonal_picking(
         "end_day": season_end_day,
     });
 
-    println!("spot_id: {}", spot_id);
-    println!("body: {}", body);
-
     let resp = reqwest::Client::new()
         .post(format!(
             "{backend_url}/api/spots/{spot_id}/seasonal_pickings/new"
         ))
         .bearer_auth(&token)
         .json(&body)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        let msg = resp.text().await.unwrap_or_default();
+        Err(ServerFnError::new(format!("Backend error: {msg}")))
+    }
+}
+
+// 获取某个 spot 的 seasonal pickings
+#[server(GetSeasonalPickings, "/api")]
+pub async fn get_seasonal_pickings(spot_id: String,) -> Result<Vec<SeasonalPickingsDto>, ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .get(format!("{backend_url}/api/spots/{spot_id}/seasonal_pickings"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<Vec<SeasonalPickingsDto>> = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
+}
+
+// 删除一条 SeasonalPicking
+#[server(DeleteSeasonalPicking, "/api")]
+pub async fn delete_seasonal_picking(picking_id: String) -> Result<(), ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .delete(format!(
+            "{backend_url}/api/spots/seasonal_pickings/{picking_id}"
+        ))
+        .bearer_auth(&token)
         .send()
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?;

@@ -103,8 +103,12 @@ pub struct SeasonalPickingTypeDto {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SeasonalPickingsDto {
     #[serde(default)]
+    pub id: String,
+    #[serde(default)]
     pub spot_id: String,
     pub type_id: String,
+    #[serde(default)]
+    pub type_name: String,
     pub start_month: i16,
     pub start_day: i16,
     pub end_month: i16,

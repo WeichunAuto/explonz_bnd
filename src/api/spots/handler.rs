@@ -21,8 +21,9 @@ use crate::{
     request::{BPath, BValidQuery},
     response::{ApiResponse, ApiResult},
     service::spots::{
-        create_seasonal_picking_service, create_spot_service, get_seasonal_picking_types_service,
-        get_spot_service, get_spots_service, update_spot_service,
+        create_seasonal_picking_service, create_spot_service, delete_seasonal_picking_service,
+        get_seasonal_picking_types_service, get_seasonal_pickings_service, get_spot_service,
+        get_spots_service, update_spot_service,
     },
 };
 
@@ -115,6 +116,26 @@ pub async fn create_seasonal_picking(
 ) -> ApiResult<()> {
     create_seasonal_picking_service(&db, spot_id, seasonal_pickings_params).await?;
     Ok(ApiResponse::success("ok", None))
+}
+
+// 删除一条 SeasonalPicking
+#[debug_handler]
+pub async fn delete_seasonal_picking(
+    State(AppState { db, .. }): State<AppState>,
+    BPath(picking_id): BPath<Uuid>,
+) -> ApiResult<()> {
+    delete_seasonal_picking_service(&db, picking_id).await?;
+    Ok(ApiResponse::success("ok", None))
+}
+
+// 获取当前 Spot 的所有 SeasonalPickings
+#[debug_handler]
+pub async fn get_seasonal_pickings(
+    State(AppState { db, .. }): State<AppState>,
+    BPath(spot_id): BPath<Uuid>,
+) -> ApiResult<Vec<SeasonalPickingsDto>> {
+    let seasonal_pickings = get_seasonal_pickings_service(&db, spot_id).await?;
+    Ok(ApiResponse::success("ok", Some(seasonal_pickings)))
 }
 
 #[debug_handler]

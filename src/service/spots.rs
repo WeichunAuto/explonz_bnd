@@ -13,7 +13,8 @@ use uuid::Uuid;
 use crate::api::spots::dto::{CreateSpotRequest, UpdateSpotRequest};
 use crate::api::spots::handler::SpotQuery;
 use explonz_shared::entity::{
-    prelude::*, seasonal_pickings, spot_label_assignments, spot_labels, spot_opening_hours, spots,
+    prelude::*, seasonal_picking_types, seasonal_pickings, spot_label_assignments, spot_labels,
+    spot_opening_hours, spots,
 };
 
 pub async fn create_spot_service(
@@ -352,7 +353,7 @@ pub async fn create_seasonal_picking_service(
     spot_id: Uuid,
     seasonal_pickings_params: SeasonalPickingsDto,
 ) -> anyhow::Result<()> {
-    tracing::info!("payload: {:?}", seasonal_pickings_params);
+    // tracing::info!("payload: {:?}", seasonal_pickings_params);
     let model = seasonal_pickings::ActiveModel {
         spot_id: Set(spot_id),
         season_start_month: Set(seasonal_pickings_params.start_month),
@@ -365,5 +366,44 @@ pub async fn create_seasonal_picking_service(
         ..Default::default()
     };
     model.insert(db).await?;
+    Ok(())
+}
+
+// 获取当前 Spot 的所有 SeasonalPickings（含 picking type 名称）
+pub async fn get_seasonal_pickings_service(
+    db: &DatabaseConnection,
+    spot_id: Uuid,
+) -> anyhow::Result<Vec<SeasonalPickingsDto>> {
+    let results: Vec<(seasonal_pickings::Model, Option<seasonal_picking_types::Model>)> =
+        SeasonalPickings::find()
+            .filter(seasonal_pickings::Column::SpotId.eq(spot_id))
+            .find_also_related(SeasonalPickingTypes)
+            .order_by_desc(seasonal_pickings::Column::CreatedAt)
+            .all(db)
+            .await?;
+
+    let dtos = results
+        .into_iter()
+        .map(|(model, type_model)| SeasonalPickingsDto {
+            id: model.id.to_string(),
+            spot_id: model.spot_id.to_string(),
+            type_id: model.picking_type_id.to_string(),
+            type_name: type_model.map(|t| t.name).unwrap_or_default(),
+            start_month: model.season_start_month,
+            start_day: model.season_start_day,
+            end_month: model.season_end_month,
+            end_day: model.season_end_day,
+        })
+        .collect();
+
+    Ok(dtos)
+}
+
+// 删除一条 SeasonalPicking
+pub async fn delete_seasonal_picking_service(
+    db: &DatabaseConnection,
+    picking_id: Uuid,
+) -> anyhow::Result<()> {
+    SeasonalPickings::delete_by_id(picking_id).exec(db).await?;
     Ok(())
 }

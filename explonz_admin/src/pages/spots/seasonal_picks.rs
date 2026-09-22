@@ -3,7 +3,11 @@ use crate::components::ui::dialog::{
     Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader,
     DialogTitle, DialogTrigger,
 };
-use crate::server::spots::{create_seasonal_picking, get_seasonal_picking_types};
+use crate::pages::spots::seasonal_picks_list::SeasonalPicksList;
+use crate::server::spots::{
+    create_seasonal_picking, delete_seasonal_picking, get_seasonal_picking_types,
+    get_seasonal_pickings,
+};
 use explonz_shared::common::dto::{SeasonalPickingTypeDto, SeasonalPickingsDto};
 use icons::{Check, Plus, TimerReset, Trash2};
 use leptos::task::spawn_local;
@@ -49,22 +53,33 @@ pub fn SeasonalPicks(
 
     let drafts: RwSignal<Vec<DraftPicking>> = RwSignal::new(vec![]);
     let next_id: RwSignal<u32> = RwSignal::new(0);
+    // 0 = 未打开过弹框（不发请求），>0 = 每次打开或保存后递增触发刷新
+    let fetch_version: RwSignal<u32> = RwSignal::new(0);
+
+    let list_resource = Resource::new(
+        move || fetch_version.get(),
+        move |version| async move {
+            if version == 0 {
+                return Ok(vec![]);
+            }
+            get_seasonal_pickings(spot_id.get_value()).await
+        },
+    );
 
     let on_open = Callback::new(move |_| {
-        if seasonal_types.get_untracked().is_some() {
-            return;
+        // 每次打开弹框都重新获取 pickings 列表
+        fetch_version.update(|v| *v += 1);
+        // Types 只需加载一次
+        if seasonal_types.get_untracked().is_none() {
+            spawn_local(async move {
+                match get_seasonal_picking_types().await {
+                    Ok(data) => on_load.run(data),
+                    Err(err) => {
+                        logging::log!("Failed to load seasonal picking types: {err}");
+                    }
+                }
+            });
         }
-        spawn_local(async move {
-            match get_seasonal_picking_types().await {
-                Ok(data) => {
-                    // logging::log!("seasonal_picking_types_data: {:?}", data);
-                    on_load.run(data);
-                }
-                Err(err) => {
-                    logging::log!("Failed to load seasonal picking types: {err}");
-                }
-            }
-        });
     });
 
     let add_draft = move |_| {
@@ -104,46 +119,64 @@ pub fn SeasonalPicks(
                         </DialogDescription>
                     </DialogHeader>
 
-                    // TODO: load & display existing saved pickings from server
-
-                    // Draft rows / empty state
-                    {move || {
-                        if drafts.get().is_empty() {
-                            view! {
-                                <p class="text-sm text-muted-foreground text-center py-4 border rounded-lg">
-                                    "No seasonal picks yet. Click \"Add\" to get started."
-                                </p>
-                            }
-                            .into_any()
-                        } else {
-                            view! {
-                                <div class="flex flex-col gap-2">
-                                    <For
-                                        each=move || drafts.get()
-                                        key=|d| d.local_id
-                                        children=move |draft| {
-                                            let lid = draft.local_id;
-                                            let sid = spot_id.get_value();
-                                            view! {
-                                                <DraftPickingRow
-                                                    spot_id=sid
-                                                    draft=draft
-                                                    seasonal_types=seasonal_types
-                                                    on_remove=Callback::new(move |_| {
-                                                        drafts
-                                                            .update(|v| {
-                                                                v.retain(|d| d.local_id != lid)
-                                                            });
-                                                    })
-                                                />
-                                            }
-                                        }
-                                    />
-                                </div>
-                            }
-                            .into_any()
+                    <Suspense fallback=move || {
+                        view! {
+                            <p class="text-sm text-muted-foreground text-center py-2">
+                                "Loading..."
+                            </p>
                         }
-                    }}
+                    }>
+                        {move || {
+                            match list_resource.get() {
+                                None => view! { <></> }.into_any(),
+                                Some(Ok(pickings)) => view! {
+                                    <SeasonalPicksList
+                                        seasonal_pickings=pickings
+                                        on_delete=Callback::new(move |picking_id: String| {
+                                            leptos::task::spawn_local(async move {
+                                                match delete_seasonal_picking(picking_id).await {
+                                                    Ok(_) => fetch_version.update(|v| *v += 1),
+                                                    Err(e) => leptos::logging::log!("Delete failed: {e}"),
+                                                }
+                                            });
+                                        })
+                                    />
+                                }
+                                .into_any(),
+                                Some(Err(e)) => view! {
+                                    <p class="text-sm text-destructive text-center py-2">
+                                        {e.to_string()}
+                                    </p>
+                                }
+                                .into_any(),
+                            }
+                        }}
+                    </Suspense>
+
+                    // Draft rows
+                    <div class="flex flex-col gap-2">
+                        <For
+                            each=move || drafts.get()
+                            key=|d| d.local_id
+                            children=move |draft| {
+                                let lid = draft.local_id;
+                                let sid = spot_id.get_value();
+                                view! {
+                                    <DraftPickingRow
+                                        spot_id=sid
+                                        draft=draft
+                                        seasonal_types=seasonal_types
+                                        on_remove=Callback::new(move |saved: bool| {
+                                            drafts.update(|v| v.retain(|d| d.local_id != lid));
+                                            if saved {
+                                                fetch_version.update(|v| *v += 1);
+                                            }
+                                        })
+                                    />
+                                }
+                            }
+                        />
+                    </div>
 
                     <Button
                         variant=ButtonVariant::Outline
@@ -169,7 +202,7 @@ fn DraftPickingRow(
     spot_id: String,
     draft: DraftPicking,
     seasonal_types: ReadSignal<Option<Vec<SeasonalPickingTypeDto>>>,
-    on_remove: Callback<()>,
+    on_remove: Callback<bool>,
 ) -> impl IntoView {
     let DraftPicking {
         local_id: _,
@@ -194,7 +227,7 @@ fn DraftPickingRow(
         });
 
     Effect::new(move |_| match save_action.value().get() {
-        Some(Ok(_)) => on_remove.run(()),
+        Some(Ok(_)) => on_remove.run(true),
         Some(Err(e)) => save_error.set(Some(e.to_string())),
         None => {}
     });
@@ -206,8 +239,10 @@ fn DraftPickingRow(
         }
         save_error.set(None);
         save_action.dispatch(SeasonalPickingsDto {
+            id: String::new(),
             spot_id: spot_id.clone(),
             type_id: type_id_val,
+            type_name: String::new(),
             start_month: start_month.get_untracked() as i16,
             start_day: start_day.get_untracked() as i16,
             end_month: end_month.get_untracked() as i16,
@@ -337,7 +372,7 @@ fn DraftPickingRow(
                         variant=ButtonVariant::Ghost
                         size=ButtonSize::IconSm
                         attr:disabled=move || save_action.pending().get()
-                        on:click=move |_| on_remove.run(())
+                        on:click=move |_| on_remove.run(false)
                     >
                         <Trash2 class="size-3.5" />
                     </Button>

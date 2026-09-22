@@ -13,20 +13,7 @@ use icons::{Check, Plus, TimerReset, Trash2};
 use leptos::task::spawn_local;
 use leptos::{logging, prelude::*};
 
-const MONTHS: [(&str, u8); 12] = [
-    ("Jan", 1),
-    ("Feb", 2),
-    ("Mar", 3),
-    ("Apr", 4),
-    ("May", 5),
-    ("Jun", 6),
-    ("Jul", 7),
-    ("Aug", 8),
-    ("Sep", 9),
-    ("Oct", 10),
-    ("Nov", 11),
-    ("Dec", 12),
-];
+use crate::pages::spots::MONTHS;
 
 const SELECT_CLS: &str = "text-foreground border-input h-9 rounded-md border bg-transparent \
     dark:bg-input/30 px-2 py-1 text-sm shadow-xs outline-none \

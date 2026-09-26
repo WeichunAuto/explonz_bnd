@@ -188,10 +188,10 @@ pub fn Sidenav02MobileSheet(
 const SPOTS_LINKS: &[(&str, &str)] = &[
     ("/admin/home/explonz/spots/spot_list", "Spots"),
     ("/admin/home/explonz/spots/label_list", "Labels"),
-    ("/view/sidenav02/docs/components/button", "Button"),
-    ("/view/sidenav02/docs/components/card", "Card"),
-    ("/view/sidenav02/docs/components/checkbox", "Checkbox"),
-    ("/view/sidenav02/docs/components/dialog", "Dialog"),
+    (
+        "/admin/home/explonz/spots/seasonal_picks_list",
+        "Seasonal Picks",
+    ),
 ];
 
 const HOOKS_LINKS: &[(&str, &str)] = &[

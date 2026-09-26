@@ -10,8 +10,7 @@ use leptos_router::{MatchNestedRoutes, StaticSegment, WildcardSegment};
 use super::sidenav_routes::ExplonzRoutes;
 // use crate::components::ui::sidenav::SidenavVariant;
 use crate::{
-    components::{blocks::sidenav_inset_right::SidenavInsetRight, ui::sidenav::SidenavVariant},
-    pages::{labels::list::LabelList, spots::list::SpotList},
+    components::{blocks::sidenav_inset_right::SidenavInsetRight, ui::sidenav::SidenavVariant}, pages::{labels::list::LabelList, spots::{list::SpotList, seasonal_picks_list::SeasonalPicksList}},
 };
 
 #[component(transparent)]
@@ -43,6 +42,7 @@ pub fn SidenavRoutesSimplified(
             <ParentRoute path=StaticSegment(ExplonzRoutes::Spots.as_ref()) view=|| view! { <Outlet /> }>
                 <Route path=StaticSegment("") view=|| () />
                 <Route path=path!("/spot_list")  view=SpotList/>
+                <Route path=path!("/seasonal_picks_list")  view=SeasonalPicksList/>
                 <Route path=path!("/label_list") view=LabelList/>
             </ParentRoute>
 

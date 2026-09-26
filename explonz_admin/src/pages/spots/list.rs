@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use explonz_shared::common::dto::SeasonalPickingTypeDto;
 use explonz_shared::common::{dto::SpotDto, pagination::Page};
 use icons::{Trash2, X};
@@ -9,23 +11,24 @@ use crate::components::ui::card::{Card, CardContent};
 use crate::components::ui::input::{Input, InputType};
 use crate::components::ui::label::Label;
 use crate::components::ui::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
+use crate::pages::spots::add_seasonal_picks::AddSeasonalPicks;
 use crate::pages::spots::addition::SpotAddition;
 use crate::pages::spots::detail::SpotDetail;
-use crate::pages::spots::seasonal_picks::SeasonalPicks;
-use crate::server::spots::{get_spots, DeleteSpot};
+use crate::server::spots::{get_seasonal_picking_types, get_spots, DeleteSpot};
 
+// 每页显示的行数
 const PAGE_SIZE: u64 = 3;
 
 #[component]
 pub fn SpotList() -> impl IntoView {
-    // 父组件缓存 SeasonalPickingTypes
-    let seasonal_types = RwSignal::new(None::<Vec<SeasonalPickingTypeDto>>);
-
-    // 传递给子组件的回调函数，在子组件第一次加载时请求 seasonal_types 数据
-    let on_loaded = Callback::new(move |data: Vec<SeasonalPickingTypeDto>| {
-        println!("data: {:?}", data);
-        seasonal_types.set(Some(data));
-    });
+    // 请求 seasonal types
+    let seasonal_types_res = Resource::new(
+        || (),
+        |_| async {
+            let types = get_seasonal_picking_types().await?;
+            Ok::<_, ServerFnError>(Arc::new(types))
+        },
+    );
 
     // ── 导航 ─────────────────────────────────────────────────────────────
     let location = use_location();
@@ -235,7 +238,6 @@ pub fn SpotList() -> impl IntoView {
                                             .into_iter()
                                             .map(|spot: SpotDto| {
                                                 let spot_id = spot.id.to_string();
-                                                let edit_url = format!("{}/edit/{}", sb, spot_id);
                                                 let id_confirm = spot_id.clone();
                                                 let id_delete = spot_id.clone();
                                                 let id_cancel = spot_id.clone();
@@ -375,7 +377,23 @@ pub fn SpotList() -> impl IntoView {
                                                                     </div>
                                                                 </Show>
 
-                                                                <SeasonalPicks spot_id=id_seasonal_picks seasonal_types=seasonal_types.read_only() on_load=on_loaded/>
+                                                                // 添加 seasonal picks
+                                                                <Suspense fallback=|| view! { <p>"Loading..."</p> }>
+                                                                {move ||
+                                                                    seasonal_types_res.get().map(|result| {
+                                                                        match result {
+                                                                            Ok(types) => view! {
+                                                                                <AddSeasonalPicks spot_id=id_seasonal_picks.clone() seasonal_types=types.to_vec()/>
+                                                                            }.into_any(),
+                                                                            Err(e) => view! {
+                                                                                <p>{format!("Error: {e}")}</p>
+                                                                            }.into_any()
+                                                                        }
+                                                                    })
+                                                                }
+                                                                </Suspense>
+
+
                                                             </div>
                                                         </TableCell>
                                                     </TableRow>

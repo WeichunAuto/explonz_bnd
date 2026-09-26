@@ -3,7 +3,7 @@ use crate::components::ui::dialog::{
     Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader,
     DialogTitle, DialogTrigger,
 };
-use crate::pages::spots::seasonal_picks_list::SeasonalPicksList;
+use crate::pages::spots::spot_seasonal_picks::SpotSeasonalPicks;
 use crate::server::spots::{
     create_seasonal_picking, delete_seasonal_picking, get_seasonal_picking_types,
     get_seasonal_pickings,
@@ -31,10 +31,9 @@ struct DraftPicking {
 }
 
 #[component]
-pub fn SeasonalPicks(
+pub fn AddSeasonalPicks(
     spot_id: String,
-    seasonal_types: ReadSignal<Option<Vec<SeasonalPickingTypeDto>>>,
-    on_load: Callback<Vec<SeasonalPickingTypeDto>>,
+    seasonal_types: Vec<SeasonalPickingTypeDto>,
 ) -> impl IntoView {
     let spot_id = StoredValue::new(spot_id);
 
@@ -56,17 +55,6 @@ pub fn SeasonalPicks(
     let on_open = Callback::new(move |_| {
         // 每次打开弹框都重新获取 pickings 列表
         fetch_version.update(|v| *v += 1);
-        // Types 只需加载一次
-        if seasonal_types.get_untracked().is_none() {
-            spawn_local(async move {
-                match get_seasonal_picking_types().await {
-                    Ok(data) => on_load.run(data),
-                    Err(err) => {
-                        logging::log!("Failed to load seasonal picking types: {err}");
-                    }
-                }
-            });
-        }
     });
 
     let add_draft = move |_| {
@@ -117,7 +105,7 @@ pub fn SeasonalPicks(
                             match list_resource.get() {
                                 None => view! { <></> }.into_any(),
                                 Some(Ok(pickings)) => view! {
-                                    <SeasonalPicksList
+                                    <SpotSeasonalPicks
                                         seasonal_pickings=pickings
                                         on_delete=Callback::new(move |picking_id: String| {
                                             leptos::task::spawn_local(async move {
@@ -152,7 +140,7 @@ pub fn SeasonalPicks(
                                     <DraftPickingRow
                                         spot_id=sid
                                         draft=draft
-                                        seasonal_types=seasonal_types
+                                        seasonal_types=seasonal_types.clone()
                                         on_remove=Callback::new(move |saved: bool| {
                                             drafts.update(|v| v.retain(|d| d.local_id != lid));
                                             if saved {
@@ -188,7 +176,7 @@ pub fn SeasonalPicks(
 fn DraftPickingRow(
     spot_id: String,
     draft: DraftPicking,
-    seasonal_types: ReadSignal<Option<Vec<SeasonalPickingTypeDto>>>,
+    seasonal_types: Vec<SeasonalPickingTypeDto>,
     on_remove: Callback<bool>,
 ) -> impl IntoView {
     let DraftPicking {
@@ -242,35 +230,27 @@ fn DraftPickingRow(
             <div class="flex flex-row gap-4 justify-between">
 
                 // Col 1: type selector
-                <div class="flex items-center gap-2">
-                    <select
-                        class=format!("{SELECT_CLS} flex-1 min-w-0")
-                        disabled=move || seasonal_types.get().is_none() || save_action.pending().get()
-                        prop:value=move || type_id.get()
-                        on:change=move |e| type_id.set(event_target_value(&e))
-                    >
-                        <option value="">
-                            {move || {
-                                if seasonal_types.get().is_none() {
-                                    "Loading..."
-                                } else {
+                    <div class="flex items-center gap-2">
+                        <select
+                            class=format!("{SELECT_CLS} flex-1 min-w-0")
+                            disabled=move || save_action.pending().get()
+                            prop:value=move || type_id.get()
+                            on:change=move |e| type_id.set(event_target_value(&e))
+                        >
+                            <option value="">
                                     "— Select type —"
-                                }
+                            </option>
+                            {move || {
+                                seasonal_types
+                                    .iter()
+                                    .map(|t| {
+                                        let id = t.id.to_string();
+                                        view! { <option value=id>{t.name.clone()}</option> }.into_any()
+                                    })
+                                    .collect_view()
                             }}
-                        </option>
-                        {move || {
-                            seasonal_types
-                                .get()
-                                .unwrap_or_default()
-                                .into_iter()
-                                .map(|t| {
-                                    let id = t.id.to_string();
-                                    view! { <option value=id>{t.name}</option> }
-                                })
-                                .collect_view()
-                        }}
-                    </select>
-                </div>
+                        </select>
+                    </div>
 
                 // Col 2: season date range
                 <div class="flex items-center gap-2">

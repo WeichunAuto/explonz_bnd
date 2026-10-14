@@ -5,6 +5,7 @@ use leptos_router::{
     path,
 };
 
+use crate::components::ui::sonner::{SonnerPosition, SonnerToaster};
 use crate::pages::{auth_guard::AuthGuard, home::index::Sidenav02Routes, login::login::LoginPage};
 
 #[component]
@@ -23,5 +24,6 @@ pub fn App() -> impl IntoView {
                 </ParentRoute>
             </Routes>
         </Router>
+        <SonnerToaster position=SonnerPosition::BottomRight />
     }
 }

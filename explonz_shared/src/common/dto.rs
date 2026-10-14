@@ -115,6 +115,44 @@ pub struct SeasonalPickingsDto {
     pub end_day: i16,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonalPickingSpotItemDto {
+    pub picking_id: String,
+    pub spot_id: String,
+    pub spot_name: String,
+    pub location: String,
+    pub rating: String,
+    pub start_month: i16,
+    pub start_day: i16,
+    pub end_month: i16,
+    pub end_day: i16,
+    pub created_at: String, // formatted as "01 Jan 2026"
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonalPickingTypeWithSpotsDto {
+    pub type_id: String,
+    pub type_name: String,
+    pub start_month: i16,
+    pub start_day: i16,
+    pub end_month: i16,
+    pub end_day: i16,
+    pub spots: Vec<SeasonalPickingSpotItemDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActualSeasonalPickDto {
+    pub id: String,
+    pub picking_id: String,
+    pub year: i16,
+    pub actual_start: String, // "YYYY-MM-DD"
+    pub actual_end: String,   // "YYYY-MM-DD"
+    pub notes: String,
+}
+
 #[cfg(feature = "ssr")]
 impl From<crate::entity::posts::Model> for PostDto {
     fn from(m: crate::entity::posts::Model) -> Self {

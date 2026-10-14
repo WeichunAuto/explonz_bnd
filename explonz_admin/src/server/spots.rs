@@ -1,6 +1,10 @@
 use crate::server::ApiResp;
 use explonz_shared::common::{
-    dto::{SeasonalPickingTypeDto, SeasonalPickingsDto, SpotDto}, pagination::Page,
+    dto::{
+        ActualSeasonalPickDto, SeasonalPickingTypeDto, SeasonalPickingTypeWithSpotsDto,
+        SeasonalPickingsDto, SpotDto,
+    },
+    pagination::Page,
 };
 use leptos::prelude::*;
 
@@ -287,12 +291,16 @@ pub async fn create_seasonal_picking(
 
 // 获取某个 spot 的 seasonal pickings
 #[server(GetSeasonalPickings, "/api")]
-pub async fn get_seasonal_pickings(spot_id: String,) -> Result<Vec<SeasonalPickingsDto>, ServerFnError> {
+pub async fn get_seasonal_pickings(
+    spot_id: String,
+) -> Result<Vec<SeasonalPickingsDto>, ServerFnError> {
     let token = crate::server::extract_token().await?;
     let backend_url = crate::server::backend_url();
 
     let resp = reqwest::Client::new()
-        .get(format!("{backend_url}/api/spots/{spot_id}/seasonal_pickings"))
+        .get(format!(
+            "{backend_url}/api/spots/{spot_id}/seasonal_pickings"
+        ))
         .bearer_auth(&token)
         .send()
         .await
@@ -402,6 +410,35 @@ pub async fn geocode_location(address: String) -> Result<(f64, f64), ServerFnErr
     ))
 }
 
+// 获取所有 seasonal pickings，按 picking type 分组，含 spot 信息
+#[server(GetAllSeasonalPickingsWithSpots, "/api")]
+pub async fn get_all_seasonal_pickings_with_spots(
+) -> Result<Vec<SeasonalPickingTypeWithSpotsDto>, ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let resp = reqwest::Client::new()
+        .get(format!("{backend_url}/api/spots/seasonal_pickings/all"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<Vec<SeasonalPickingTypeWithSpotsDto>> = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
+}
+
 /// 图片上传结果，供 addition.rs 中的 PhotoStatus::Done 使用
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PhotoUploadResponse {
@@ -478,4 +515,50 @@ pub async fn upload_photo(
 #[server(DeletePhoto, "/api")]
 pub async fn delete_photo(img_id: String) -> Result<(), ServerFnError> {
     Ok(())
+}
+
+// Upsert 一条 SeasonalPickingActual（按 picking_id + year）
+#[server(UpsertActualSeasonalPick, "/api")]
+pub async fn upsert_actual_seasonal_pick(
+    picking_id: String,
+    actual_start: String, // "YYYY-MM-DD"
+    actual_end: String,   // "YYYY-MM-DD"
+    notes: String,
+) -> Result<ActualSeasonalPickDto, ServerFnError> {
+    let token = crate::server::extract_token().await?;
+    let backend_url = crate::server::backend_url();
+
+    let body = serde_json::json!({
+        "actual_start": actual_start,
+        "actual_end": actual_end,
+        "notes": notes,
+    });
+
+    let url = format!(
+        "{backend_url}/api/spots/seasonal_pickings/{picking_id}/actuals/new"
+    );
+
+    // println!("url = {:?}", url);
+
+    let resp = reqwest::Client::new()
+        .post(url)
+        .bearer_auth(&token)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    if !resp.status().is_success() {
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!("Backend error: {msg}")));
+    }
+
+    let parsed: ApiResp<ActualSeasonalPickDto> = resp
+        .json()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    parsed
+        .data
+        .ok_or_else(|| ServerFnError::new("No data returned"))
 }

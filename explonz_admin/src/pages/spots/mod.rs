@@ -1,10 +1,11 @@
+pub mod add_seasonal_picks;
 pub mod addition;
+pub mod confirm_actual_seasonal_picks;
 pub mod detail;
 pub mod edit;
 pub mod list;
-pub mod add_seasonal_picks;
-pub mod spot_seasonal_picks;
 pub mod seasonal_picks_list;
+pub mod spot_seasonal_picks;
 
 pub const MONTHS: [(&str, u8); 12] = [
     ("Jan", 1),

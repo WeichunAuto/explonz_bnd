@@ -56,7 +56,10 @@ fn upload_file(file: web_sys::File, id: u32, photos: RwSignal<Vec<PhotoItem>>) {
         let form_data = web_sys::FormData::new().unwrap();
         let _ = form_data.append_with_blob("file", &file);
         let new_status = match upload_photo(MultipartData::from(form_data)).await {
-            Ok(resp) => PhotoStatus::Done { img_id: resp.id, url: resp.url },
+            Ok(resp) => PhotoStatus::Done {
+                img_id: resp.id,
+                url: resp.url,
+            },
             Err(e) => PhotoStatus::Failed(format!("{e}")),
         };
         photos.update(|v| {
@@ -77,7 +80,12 @@ fn process_files(
         if let Some(file) = files.item(i) {
             let local_id = next_id.get_untracked();
             next_id.update(|n| *n += 1);
-            photos.update(|v| v.push(PhotoItem { id: local_id, status: PhotoStatus::Uploading }));
+            photos.update(|v| {
+                v.push(PhotoItem {
+                    id: local_id,
+                    status: PhotoStatus::Uploading,
+                })
+            });
             upload_file(file, local_id, photos);
         }
     }
@@ -190,7 +198,10 @@ fn SpotAdditionInner(spot_dto: Option<SpotDto>, on_created: Callback<()>) -> imp
             let img_id = url.rsplit('/').next().unwrap_or("").to_string();
             PhotoItem {
                 id: i as u32,
-                status: PhotoStatus::Done { img_id, url: url.clone() },
+                status: PhotoStatus::Done {
+                    img_id,
+                    url: url.clone(),
+                },
             }
         })
         .collect();

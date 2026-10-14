@@ -48,3 +48,10 @@ pub struct ImageUploadResponse {
     pub id: String,
     pub url: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct UpsertActualSeasonalPickRequest {
+    pub actual_start: String, // "YYYY-MM-DD"
+    pub actual_end: String,   // "YYYY-MM-DD"
+    pub notes: String,
+}

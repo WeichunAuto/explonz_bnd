@@ -6,7 +6,10 @@ use axum::{
     Json,
 };
 use explonz_shared::common::{
-    dto::{SeasonalPickingTypeDto, SeasonalPickingsDto, SpotDto},
+    dto::{
+        ActualSeasonalPickDto, SeasonalPickingTypeDto, SeasonalPickingTypeWithSpotsDto,
+        SeasonalPickingsDto, SpotDto,
+    },
     pagination::{Page, Pagination},
     utils::dir_into_url_path,
 };
@@ -15,15 +18,16 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    api::spots::dto::{CreateSpotRequest, ImageUploadResponse, UpdateSpotRequest},
+    api::spots::dto::{CreateSpotRequest, ImageUploadResponse, UpdateSpotRequest, UpsertActualSeasonalPickRequest},
     application::AppState,
     error::ApiError,
     request::{BPath, BValidQuery},
     response::{ApiResponse, ApiResult},
     service::spots::{
         create_seasonal_picking_service, create_spot_service, delete_seasonal_picking_service,
-        get_seasonal_picking_types_service, get_seasonal_pickings_service, get_spot_service,
-        get_spots_service, update_spot_service,
+        get_all_seasonal_pickings_with_spots_service, get_seasonal_picking_types_service,
+        get_seasonal_pickings_service, get_spot_service, get_spots_service, update_spot_service,
+        upsert_actual_seasonal_pick_service,
     },
 };
 
@@ -118,6 +122,15 @@ pub async fn create_seasonal_picking(
     Ok(ApiResponse::success("ok", None))
 }
 
+// 获取所有 seasonal pickings，按 picking type 分组，含 spot 信息
+#[debug_handler]
+pub async fn get_all_seasonal_pickings_with_spots(
+    State(AppState { db, .. }): State<AppState>,
+) -> ApiResult<Vec<SeasonalPickingTypeWithSpotsDto>> {
+    let data = get_all_seasonal_pickings_with_spots_service(&db).await?;
+    Ok(ApiResponse::success("ok", Some(data)))
+}
+
 // 删除一条 SeasonalPicking
 #[debug_handler]
 pub async fn delete_seasonal_picking(
@@ -204,4 +217,23 @@ pub async fn upload_image(
             url,
         }),
     ))
+}
+
+// 更新一个Spot当前年份的 实际seasonal picks
+#[debug_handler]
+pub async fn upsert_actual_seasonal_pick(
+    State(AppState { db, .. }): State<AppState>,
+    BPath(picking_id): BPath<Uuid>,
+    Json(body): Json<UpsertActualSeasonalPickRequest>,
+) -> ApiResult<ActualSeasonalPickDto> {
+    let actual_start = chrono::NaiveDate::parse_from_str(&body.actual_start, "%Y-%m-%d")
+        .map_err(|e| ApiError::BizError(format!("Invalid actual_start: {e}")))?;
+    let actual_end = chrono::NaiveDate::parse_from_str(&body.actual_end, "%Y-%m-%d")
+        .map_err(|e| ApiError::BizError(format!("Invalid actual_end: {e}")))?;
+
+    let dto = upsert_actual_seasonal_pick_service(&db, picking_id, actual_start, actual_end, body.notes)
+        .await
+        .map_err(|e| ApiError::InternalError(e))?;
+
+    Ok(ApiResponse::success("actual seasonal pick saved", Some(dto)))
 }

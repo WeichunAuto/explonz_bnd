@@ -21,6 +21,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::seasonal_picking_actuals::Entity")]
+    SeasonalPickingActuals,
     #[sea_orm(
         belongs_to = "super::seasonal_picking_types::Entity",
         from = "Column::PickingTypeId",
@@ -37,6 +39,12 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Spots,
+}
+
+impl Related<super::seasonal_picking_actuals::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SeasonalPickingActuals.def()
+    }
 }
 
 impl Related<super::seasonal_picking_types::Entity> for Entity {

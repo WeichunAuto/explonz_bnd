@@ -10,7 +10,11 @@ use leptos_router::{MatchNestedRoutes, StaticSegment, WildcardSegment};
 use super::sidenav_routes::ExplonzRoutes;
 // use crate::components::ui::sidenav::SidenavVariant;
 use crate::{
-    components::{blocks::sidenav_inset_right::SidenavInsetRight, ui::sidenav::SidenavVariant}, pages::{labels::list::LabelList, spots::{list::SpotList, seasonal_picks_list::SeasonalPicksList}},
+    components::{blocks::sidenav_inset_right::SidenavInsetRight, ui::sidenav::SidenavVariant},
+    pages::{
+        labels::list::LabelList,
+        spots::{list::SpotList, seasonal_picks_list::SeasonalPicksList},
+    },
 };
 
 #[component(transparent)]

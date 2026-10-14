@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use explonz_shared::common::dto::{
-    LabelDto, OpeningHourDto, SeasonalPickingTypeDto, SeasonalPickingsDto, SpotDto,
+    ActualSeasonalPickDto, LabelDto, OpeningHourDto, SeasonalPickingSpotItemDto,
+    SeasonalPickingTypeDto, SeasonalPickingTypeWithSpotsDto, SeasonalPickingsDto, SpotDto,
 };
 use explonz_shared::common::pagination::Page;
 use sea_orm::{
@@ -13,8 +14,8 @@ use uuid::Uuid;
 use crate::api::spots::dto::{CreateSpotRequest, UpdateSpotRequest};
 use crate::api::spots::handler::SpotQuery;
 use explonz_shared::entity::{
-    prelude::*, seasonal_picking_types, seasonal_pickings, spot_label_assignments, spot_labels,
-    spot_opening_hours, spots,
+    prelude::*, seasonal_picking_actuals, seasonal_picking_types, seasonal_pickings,
+    spot_label_assignments, spot_labels, spot_opening_hours, spots,
 };
 
 pub async fn create_spot_service(
@@ -374,13 +375,15 @@ pub async fn get_seasonal_pickings_service(
     db: &DatabaseConnection,
     spot_id: Uuid,
 ) -> anyhow::Result<Vec<SeasonalPickingsDto>> {
-    let results: Vec<(seasonal_pickings::Model, Option<seasonal_picking_types::Model>)> =
-        SeasonalPickings::find()
-            .filter(seasonal_pickings::Column::SpotId.eq(spot_id))
-            .find_also_related(SeasonalPickingTypes)
-            .order_by_desc(seasonal_pickings::Column::CreatedAt)
-            .all(db)
-            .await?;
+    let results: Vec<(
+        seasonal_pickings::Model,
+        Option<seasonal_picking_types::Model>,
+    )> = SeasonalPickings::find()
+        .filter(seasonal_pickings::Column::SpotId.eq(spot_id))
+        .find_also_related(SeasonalPickingTypes)
+        .order_by_desc(seasonal_pickings::Column::CreatedAt)
+        .all(db)
+        .await?;
 
     let dtos = results
         .into_iter()
@@ -399,6 +402,105 @@ pub async fn get_seasonal_pickings_service(
     Ok(dtos)
 }
 
+// 获取所有 seasonal pickings，按 picking type 分组，含 spot 信息
+pub async fn get_all_seasonal_pickings_with_spots_service(
+    db: &DatabaseConnection,
+) -> anyhow::Result<Vec<SeasonalPickingTypeWithSpotsDto>> {
+    use std::collections::HashSet;
+
+    let pickings = SeasonalPickings::find()
+        .order_by_asc(seasonal_pickings::Column::CreatedAt)
+        .all(db)
+        .await?;
+
+    if pickings.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let spot_ids: Vec<Uuid> = pickings
+        .iter()
+        .map(|p| p.spot_id)
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let type_ids: Vec<Uuid> = pickings
+        .iter()
+        .map(|p| p.picking_type_id)
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let spots_map: HashMap<Uuid, spots::Model> = Spots::find()
+        .filter(spots::Column::Id.is_in(spot_ids))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|s| (s.id, s))
+        .collect();
+
+    let types_map: HashMap<Uuid, seasonal_picking_types::Model> = SeasonalPickingTypes::find()
+        .filter(seasonal_picking_types::Column::Id.is_in(type_ids))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|t| (t.id, t))
+        .collect();
+
+    // Group pickings by type_id (preserve insertion order via a Vec of keys)
+    let mut type_order: Vec<Uuid> = Vec::new();
+    let mut type_groups: HashMap<Uuid, Vec<&seasonal_pickings::Model>> = HashMap::new();
+    for picking in &pickings {
+        let entry = type_groups
+            .entry(picking.picking_type_id)
+            .or_insert_with(|| {
+                type_order.push(picking.picking_type_id);
+                Vec::new()
+            });
+        entry.push(picking);
+    }
+
+    let mut result: Vec<SeasonalPickingTypeWithSpotsDto> = type_order
+        .into_iter()
+        .filter_map(|type_id| {
+            let type_model = types_map.get(&type_id)?;
+            let type_pickings = type_groups.get(&type_id)?;
+            let first = type_pickings.first()?;
+
+            let spots: Vec<SeasonalPickingSpotItemDto> = type_pickings
+                .iter()
+                .filter_map(|picking| {
+                    let spot = spots_map.get(&picking.spot_id)?;
+                    Some(SeasonalPickingSpotItemDto {
+                        picking_id: picking.id.to_string(),
+                        spot_id: picking.spot_id.to_string(),
+                        spot_name: spot.name.clone(),
+                        location: spot.location.clone(),
+                        rating: spot.rating.to_string(),
+                        start_month: picking.season_start_month,
+                        start_day: picking.season_start_day,
+                        end_month: picking.season_end_month,
+                        end_day: picking.season_end_day,
+                        created_at: picking.created_at.format("%d %b %Y").to_string(),
+                    })
+                })
+                .collect();
+
+            Some(SeasonalPickingTypeWithSpotsDto {
+                type_id: type_id.to_string(),
+                type_name: type_model.name.clone(),
+                start_month: first.season_start_month,
+                start_day: first.season_start_day,
+                end_month: first.season_end_month,
+                end_day: first.season_end_day,
+                spots,
+            })
+        })
+        .collect();
+
+    result.sort_by(|a, b| a.type_name.cmp(&b.type_name));
+    Ok(result)
+}
+
 // 删除一条 SeasonalPicking
 pub async fn delete_seasonal_picking_service(
     db: &DatabaseConnection,
@@ -406,4 +508,50 @@ pub async fn delete_seasonal_picking_service(
 ) -> anyhow::Result<()> {
     SeasonalPickings::delete_by_id(picking_id).exec(db).await?;
     Ok(())
+}
+
+// Upsert 一条 SeasonalPickingActual（按 picking_id + year UNIQUE）
+pub async fn upsert_actual_seasonal_pick_service(
+    db: &DatabaseConnection,
+    picking_id: Uuid,
+    actual_start: chrono::NaiveDate,
+    actual_end: chrono::NaiveDate,
+    notes: String,
+) -> anyhow::Result<ActualSeasonalPickDto> {
+    use chrono::Datelike;
+    let year = actual_start.year() as i16;
+
+    // Find existing record for this picking_id + year
+    let existing = SeasonalPickingActuals::find()
+        .filter(seasonal_picking_actuals::Column::PickingId.eq(picking_id))
+        .filter(seasonal_picking_actuals::Column::Year.eq(year))
+        .one(db)
+        .await?;
+
+    let model = if let Some(record) = existing {
+        let mut active: seasonal_picking_actuals::ActiveModel = record.into();
+        active.actual_start = Set(actual_start);
+        active.actual_end = Set(actual_end);
+        active.notes = Set(notes);
+        active.update(db).await?
+    } else {
+        let active = seasonal_picking_actuals::ActiveModel {
+            picking_id: Set(picking_id),
+            year: Set(year),
+            actual_start: Set(actual_start),
+            actual_end: Set(actual_end),
+            notes: Set(notes),
+            ..Default::default()
+        };
+        active.insert(db).await?
+    };
+
+    Ok(ActualSeasonalPickDto {
+        id: model.id.to_string(),
+        picking_id: model.picking_id.to_string(),
+        year: model.year,
+        actual_start: model.actual_start.format("%Y-%m-%d").to_string(),
+        actual_end: model.actual_end.format("%Y-%m-%d").to_string(),
+        notes: model.notes,
+    })
 }

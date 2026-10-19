@@ -127,6 +127,8 @@ pub struct SeasonalPickingSpotItemDto {
     pub start_day: i16,
     pub end_month: i16,
     pub end_day: i16,
+    pub actual_start: Option<String>, // 实际确认后的 seasonal picking start
+    pub actual_end: Option<String>, 
     pub created_at: String, // formatted as "01 Jan 2026"
 }
 

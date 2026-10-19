@@ -10,7 +10,7 @@ use sea_orm::{
 };
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, TransactionTrait};
 use uuid::Uuid;
-
+use explonz_shared::common::constants::DEFAULT_DATE_FORMAT;
 use crate::api::spots::dto::{CreateSpotRequest, UpdateSpotRequest};
 use crate::api::spots::handler::SpotQuery;
 use explonz_shared::entity::{
@@ -446,6 +446,25 @@ pub async fn get_all_seasonal_pickings_with_spots_service(
         .map(|t| (t.id, t))
         .collect();
 
+    let picking_ids: Vec<Uuid> = pickings.iter().map(|p| p.id).collect();
+    // Load actuals for all pickings; keep the latest-year record per picking_id
+    let actuals_map: HashMap<Uuid, seasonal_picking_actuals::Model> =
+        SeasonalPickingActuals::find()
+            .filter(seasonal_picking_actuals::Column::PickingId.is_in(picking_ids))
+            .all(db)
+            .await?
+            .into_iter()
+            .fold(HashMap::new(), |mut map, a| {
+                map.entry(a.picking_id)
+                    .and_modify(|existing: &mut seasonal_picking_actuals::Model| {
+                        if a.year > existing.year {
+                            *existing = a.clone();
+                        }
+                    })
+                    .or_insert(a);
+                map
+            });
+
     // Group pickings by type_id (preserve insertion order via a Vec of keys)
     let mut type_order: Vec<Uuid> = Vec::new();
     let mut type_groups: HashMap<Uuid, Vec<&seasonal_pickings::Model>> = HashMap::new();
@@ -470,6 +489,7 @@ pub async fn get_all_seasonal_pickings_with_spots_service(
                 .iter()
                 .filter_map(|picking| {
                     let spot = spots_map.get(&picking.spot_id)?;
+                    let actual = actuals_map.get(&picking.id);
                     Some(SeasonalPickingSpotItemDto {
                         picking_id: picking.id.to_string(),
                         spot_id: picking.spot_id.to_string(),
@@ -480,7 +500,9 @@ pub async fn get_all_seasonal_pickings_with_spots_service(
                         start_day: picking.season_start_day,
                         end_month: picking.season_end_month,
                         end_day: picking.season_end_day,
-                        created_at: picking.created_at.format("%d %b %Y").to_string(),
+                        actual_start: actual.map(|a| a.actual_start.format(DEFAULT_DATE_FORMAT).to_string()),
+                        actual_end: actual.map(|a| a.actual_end.format(DEFAULT_DATE_FORMAT).to_string()),
+                        created_at: picking.created_at.format(DEFAULT_DATE_FORMAT).to_string(),
                     })
                 })
                 .collect();

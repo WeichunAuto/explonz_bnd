@@ -90,6 +90,9 @@ pub fn SeasonalPicksList() -> impl IntoView {
                                                                             <th class="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                                                                                 "Season Picks"
                                                                             </th>
+                                                                            <th class="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                                                                                "Acutal Season Period"
+                                                                            </th>
                                                                             <th class="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                                                                                 "Rating"
                                                                             </th>
@@ -114,6 +117,21 @@ pub fn SeasonalPicksList() -> impl IntoView {
                                                                                         <td class="px-3 py-2 text-muted-foreground">
                                                                                             {spot.created_at}
                                                                                         </td>
+                                                                                        <td class="px-3 py-2 text-muted-foreground">
+                                                                                            {
+                                                                                                if let Some(actual_start) = spot.actual_start.clone() {
+                                                                                                view! {
+                                                                                                    <span>{format!("{} ～ {}", actual_start, spot.actual_end.clone().unwrap_or_default())}</span>
+                                                                                                }.into_any()
+
+                                                                                                } else {
+                                                                                                    view! {
+                                                                                                        <span class="text-green-500">{String::from("To be Confirmed")}</span>
+                                                                                                    }.into_any()
+
+                                                                                                }
+                                                                                            }
+                                                                                        </td>
                                                                                         <td class="px-3 py-2 text-right">
                                                                                             <span class="inline-flex items-center gap-1 text-amber-500 font-medium">
                                                                                                 "★ "
@@ -122,7 +140,7 @@ pub fn SeasonalPicksList() -> impl IntoView {
                                                                                         </td>
                                                                                         <td class="px-3 py-2 text-right">
 
-                                                                                            <ConfirmActualSeasonalPicks picking_id=spot.picking_id/>
+                                                                                            <ConfirmActualSeasonalPicks picking_id=spot.picking_id actual_start=spot.actual_start actual_end=spot.actual_end/>
                                                                                         </td>
                                                                                     </tr>
                                                                                 }

@@ -128,6 +128,7 @@ pub async fn get_all_seasonal_pickings_with_spots(
     State(AppState { db, .. }): State<AppState>,
 ) -> ApiResult<Vec<SeasonalPickingTypeWithSpotsDto>> {
     let data = get_all_seasonal_pickings_with_spots_service(&db).await?;
+    tracing::info!("data = {:?}", data);
     Ok(ApiResponse::success("ok", Some(data)))
 }
 
@@ -148,6 +149,7 @@ pub async fn get_seasonal_pickings(
     BPath(spot_id): BPath<Uuid>,
 ) -> ApiResult<Vec<SeasonalPickingsDto>> {
     let seasonal_pickings = get_seasonal_pickings_service(&db, spot_id).await?;
+
     Ok(ApiResponse::success("ok", Some(seasonal_pickings)))
 }
 

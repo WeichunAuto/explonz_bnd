@@ -31,7 +31,7 @@ heck = "0.5"
 reqwest    = { workspace = true, optional = true }
 serde_json = { workspace = true}
 dotenvy = { workspace = true, optional = true }
-time = { version = "0.3", features = ["wasm-bindgen"] }
+time = { version = "0.3", features = ["wasm-bindgen", "macros"] }
 
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]

@@ -1,0 +1,1 @@
+pub const DEFAULT_DATE_FORMAT: &str = "%d %b %Y";

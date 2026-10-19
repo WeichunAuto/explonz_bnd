@@ -14,16 +14,16 @@ use leptos::prelude::*;
 use time::{Date, Duration, Month, OffsetDateTime};
 
 #[component]
-pub fn ConfirmActualSeasonalPicks(picking_id: String) -> impl IntoView {
-    let toast_ref: NodeRef<leptos::html::Button> = NodeRef::new();
+pub fn ConfirmActualSeasonalPicks(picking_id: String, actual_start: Option<String>, actual_end: Option<String>) -> impl IntoView {
+    let trigger_label = if actual_start.is_some() && actual_end.is_some() { "Update" } else { "Confirm" };
 
     view! {
         <Dialog>
             <DialogTrigger class="border-0 shadow-none bg-transparent">
-                "Confirm"
+                {trigger_label}
             </DialogTrigger>
             <DialogContent class="max-w-md">
-                <ConfirmContent picking_id=picking_id />
+                <ConfirmContent picking_id=picking_id actual_start=actual_start actual_end=actual_end />
             </DialogContent>
         </Dialog>
     }
@@ -31,19 +31,34 @@ pub fn ConfirmActualSeasonalPicks(picking_id: String) -> impl IntoView {
 
 // Inner component rendered inside <Dialog>, so it has access to DialogContext
 #[component]
-fn ConfirmContent(picking_id: String) -> impl IntoView {
+fn ConfirmContent(
+    picking_id: String,
+    actual_start: Option<String>,
+    actual_end: Option<String>,
+) -> impl IntoView {
     // use_dialog_trigger_id() is available here because we're inside <Dialog>
     let dialog_id = use_dialog_trigger_id().unwrap_or_default();
 
-    // 初始展示显示 今日 以及 10天后的日期
+    // println!("actual_start = {:?}", actual_start);
+
     let today = OffsetDateTime::now_utc().date();
-    let end_date = today + Duration::days(10);
-    let start_date_signal = RwSignal::new(today);
-    let end_date_signal = RwSignal::new(end_date);
+    let init_start = actual_start
+        .as_deref()
+        .and_then(parse_ymd)
+        .unwrap_or(today);
+    let init_end = actual_end
+        .as_deref()
+        .and_then(parse_ymd)
+        .unwrap_or(today + Duration::days(10));
+
+    // println!("init_start = {}", init_start);
+
+    let start_date_signal = RwSignal::new(init_start);
+    let end_date_signal = RwSignal::new(init_end);
 
     // Which month/year is currently displayed in the calendar
-    let view_year: RwSignal<i32> = RwSignal::new(start_date_signal.get_untracked().year());
-    let view_month: RwSignal<Month> = RwSignal::new(start_date_signal.get_untracked().month());
+    let view_year: RwSignal<i32> = RwSignal::new(init_start.year());
+    let view_month: RwSignal<Month> = RwSignal::new(init_start.month());
 
     // true = next click sets start date; false = next click sets end date
     let selecting_start: RwSignal<bool> = RwSignal::new(true);
@@ -262,12 +277,12 @@ fn ConfirmContent(picking_id: String) -> impl IntoView {
             {move || error_msg.get().map(|e| view! {
                 <p class="text-sm text-destructive">{e}</p>
             })}
-        
+
         // 提交成功后，显示成功消息。
         {move || match success_msg.get() {
             Some(msg) => {
                 leptos::logging::log!("success_msg = {:?}", msg);
-        
+
                 view! {
                     <p class="text-sm text-green-600" role="status">
                         {msg}
@@ -291,4 +306,27 @@ fn ConfirmContent(picking_id: String) -> impl IntoView {
 
         </DialogBody>
     }
+}
+
+/// Parse a "DD Mon YYYY" string (e.g. "14 Oct 2026") into a `time::Date`.
+fn parse_ymd(s: &str) -> Option<Date> {
+    let mut parts = s.splitn(3, ' ');
+    let day: u8 = parts.next()?.parse().ok()?;
+    let month = match parts.next()? {
+        "Jan" => Month::January,
+        "Feb" => Month::February,
+        "Mar" => Month::March,
+        "Apr" => Month::April,
+        "May" => Month::May,
+        "Jun" => Month::June,
+        "Jul" => Month::July,
+        "Aug" => Month::August,
+        "Sep" => Month::September,
+        "Oct" => Month::October,
+        "Nov" => Month::November,
+        "Dec" => Month::December,
+        _ => return None,
+    };
+    let year: i32 = parts.next()?.parse().ok()?;
+    Date::from_calendar_date(year, month, day).ok()
 }

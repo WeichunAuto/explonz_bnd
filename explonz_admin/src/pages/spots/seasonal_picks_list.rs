@@ -115,7 +115,7 @@ pub fn SeasonalPicksList() -> impl IntoView {
                                                                                             {spot.location}
                                                                                         </td>
                                                                                         <td class="px-3 py-2 text-muted-foreground">
-                                                                                            {spot.created_at}
+                                                                                            {format!("{} {}", spot.start_day, month_short(spot.start_month))}
                                                                                         </td>
                                                                                         <td class="px-3 py-2 text-muted-foreground">
                                                                                             {
